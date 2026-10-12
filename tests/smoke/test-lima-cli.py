@@ -93,11 +93,12 @@ def test_lima_cli_start_with_name(runner, config):
     Test starting a Lima VM with a specific name.
     """
     vm_name = "test-named-lima-vm"
-    runner.invoke(vm.vm_group, ["delete", vm_name])
+    env = {"OS_CLOUD": "lima"}
+    runner.invoke(vm.vm_group, ["delete", vm_name], env=env)
 
-    result = runner.invoke(vm.vm_group, ["start", vm_name])
+    result = runner.invoke(vm.vm_group, ["start", vm_name], env=env)
     if result.exit_code != 0:
         pytest.skip("Lima start failed")
 
     assert f"Successfully started VM {vm_name}" in Text.from_ansi(result.output).plain
-    runner.invoke(vm.vm_group, ["delete", vm_name])
+    runner.invoke(vm.vm_group, ["delete", vm_name], env=env)
