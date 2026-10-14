@@ -6,6 +6,7 @@ The `cmx` tool provides a consistent interface for managing VMs across all suppo
 
 ```bash
 cmx vm <command> [options]
+cmx key <command> [options]
 ```
 
 ## Global Options
@@ -145,9 +146,22 @@ Lists available hardware profiles for the current cloud.
 
 #### `key`
 
-Lists available SSH keys in the current cloud.
+Manage SSH keys for the current cloud and GitHub.
 
-- **Example**: `cmx vm key`
+- **Subcommands**:
+  - `list`: List all SSH keys for the current provider.
+    - `--all`: List keys from all enabled providers.
+    - **Example**: `cmx key list --all`
+  - `scan`: Scan for local SSH keys on the host machine.
+    - `--json`: Output in JSON format.
+    - **Example**: `cmx key scan`
+  - `verify`: Check which local keys authenticate with GitHub.
+    - **Example**: `cmx key verify`
+  - `github`: Manage keys specifically on GitHub.
+    - `list`: List keys currently configured in GitHub.
+    - `upload <path_to_key>`: Upload a local key to GitHub.
+    - **Example**: `cmx key github upload ~/.ssh/id_rsa.pub`
+
 
 #### `security-group`
 
