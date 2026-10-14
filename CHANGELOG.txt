@@ -1,3 +1,9 @@
+[2026-10-14] - Feature: Implement integrated cli_step context manager for smoke tests in cli_helper.py and test-chameleon-cli.py
+- Consolidates headers, timing (StopWatch), and debug logging into a single context manager.
+- Adds automatic traceback printing on Python exceptions and automatic debug info on CLI failure.
+- Standardizes VM and reservation naming to include username prefix.
+- Adds structured JSON benchmark reporting to Chameleon CLI tests.
+
 [2026-10-14] - Feature: Add Passkey column to GitHub SSH keys list in github.py
 - Updated the `cmx key github list` command to display whether a local key has a passphrase, improving visibility of key security settings.
 
