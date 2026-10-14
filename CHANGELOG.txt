@@ -12,3 +12,5 @@
 - Fixed CLI startup crash caused by missing 'List' import in context.py.
 - Resolved Multipass security group listing issues.
 - Enforced strict username requirement in configuration to prevent VM name collisions in shared projects.
+[2026-10-14] - deps: Add python-chi to requirements.txt
+- Added python-chi dependency as specified in pyproject.toml.
