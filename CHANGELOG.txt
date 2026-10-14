@@ -1,3 +1,6 @@
+[2026-10-14] - Feature: Add Passkey column to GitHub SSH keys list in github.py
+- Updated the `cmx key github list` command to display whether a local key has a passphrase, improving visibility of key security settings.
+
 [2026-10-11] - Refactor: Move inline import of re to top of file in OpenstackManager.py
 - Improved efficiency by moving the `re` module import to the module level instead of importing it within the `_get_floating_ip` method.
 [2026-10-11] - Feature: Implement full Lifecycle Parity for AWS, Azure, and Google
@@ -9,4 +12,3 @@
 - Fixed CLI startup crash caused by missing 'List' import in context.py.
 - Resolved Multipass security group listing issues.
 - Enforced strict username requirement in configuration to prevent VM name collisions in shared projects.
-
