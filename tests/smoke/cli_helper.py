@@ -1,10 +1,29 @@
 import os
 import yaml
+import sys
+import traceback
+from rich.console import Console
+from rich.text import Text
 from cloudmesh.ai.command import vm
 from cloudmesh.ai.command.vm._shared.context import state
 from cloudmesh.ai.vm.state_manager import StateManager
 
+def print_header(msg):
+    print ()
+    Console().print(f"\n[bold blue]=== {msg} ===[/bold blue]\n")
+
+def print_debug_info(msg, result):
+    print(f"DEBUG: {msg}")
+    converted_output = Text(result.output, style="blue")
+    print(converted_output)
+    print("DEBUG: Exit code:", result.exit_code)
+    if result.exception:
+        print("DEBUG: Exception:", result.exception)
+        print("DEBUG: Exception traceback:")
+        traceback.print_exception(type(result.exception), result.exception, result.exception.__traceback__, file=sys.stdout)
+
 def setup_cli_config(tmp_path, provider_name, config_data):
+
     """
     Sets up a temporary config file and injects it into the CLI's state proxy.
     """

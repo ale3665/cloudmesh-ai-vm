@@ -2,8 +2,10 @@ import pytest
 import uuid
 from click.testing import CliRunner
 from cloudmesh.ai.command import vm
-from tests.smoke.cli_helper import setup_cli_config
+from tests.smoke.cli_helper import setup_cli_config, print_header, print_debug_info
 from tests.smoke.benchmark_helper import save_benchmark
+from cloudmesh.ai.common.stopwatch import StopWatch
+from pprint import pprint
 
 @pytest.fixture
 def runner():
@@ -14,20 +16,34 @@ def test_chameleon_cli_lifecycle(runner):
     Smoke test for Chameleon CLI lifecycle.
     """
     # 1. providers
-    result = runner.invoke(vm.vm_group, ["provider", "list"])
+
+    print_header("Fetching Provider List")
+    with StopWatch.timer("chameleon_provider_list"):
+        result = runner.invoke(vm.vm_group, ["provider", "list"])
+    print_debug_info("Provider list output:", result)
+
     assert result.exit_code == 0
     assert "chameleon" in result.output.lower()
 
+
     # 2. set
-    result = runner.invoke(vm.vm_group, ["provider", "set", "chameleon"])
+    print_header("Setting up CLI config for Chameleon...")
+    with StopWatch.timer("chameleon_provider_set"):
+        result = runner.invoke(vm.vm_group, ["provider", "set", "chameleon"])
+    print_debug_info("Provider set output:", result)
     assert result.exit_code == 0
 
+
     # 3. start
+    print_header("Starting a new Chameleon VM...")
     vm_name = f"smoke-chameleon-vm-{uuid.uuid4().hex[:6]}"
-    result = runner.invoke(vm.vm_group, ["start", vm_name])
+    with StopWatch.timer("chameleon_start"):
+        result = runner.invoke(vm.vm_group, ["start", vm_name])
+    print_debug_info("Chameleon start output:", result)
     if result.exit_code != 0:
         print(f"DEBUG: Chameleon start failed with output: {result.output}")
         pytest.skip(f"Chameleon start failed: {result.output}")
+
 
     # Capture the actual VM name (which now includes site and username)
     import re
@@ -42,28 +58,42 @@ def test_chameleon_cli_lifecycle(runner):
                 break
 
     # 4. list
-
-    result = runner.invoke(vm.vm_group, ["list"])
+    print_header(f"Checking if VM {vm_name} is in the list...")
+    with StopWatch.timer("chameleon_list"):
+        result = runner.invoke(vm.vm_group, ["list"])
+    print_debug_info("Chameleon list output:", result)
     assert result.exit_code == 0
     assert vm_name in result.output
 
     # 5. stop
-    result = runner.invoke(vm.vm_group, ["stop", vm_name])
+    print(f"Stopping VM {vm_name}...")
+    with StopWatch.timer("chameleon_stop"):
+        result = runner.invoke(vm.vm_group, ["stop", vm_name])
+    print_debug_info("Chameleon stop output:", result)
     if result.exit_code != 0:
         pytest.skip("Chameleon stop failed")
 
     # 6. delete
-    result = runner.invoke(vm.vm_group, ["delete", vm_name])
+    print_header(f"Deleting VM {vm_name}...")
+    with StopWatch.timer("chameleon_delete"):
+        result = runner.invoke(vm.vm_group, ["delete", vm_name])
+    print_debug_info("Chameleon delete output:", result)
     if result.exit_code != 0:
         pytest.skip("Chameleon delete failed")
 
     # 7. images
-    result = runner.invoke(vm.vm_group, ["image"])
+    print("Fetching Chameleon images...")
+    with StopWatch.timer("chameleon_images"):
+        result = runner.invoke(vm.vm_group, ["image"])
+    print_debug_info("Chameleon images output:", result)
     if result.exit_code != 0:
         pytest.skip("Chameleon images failed")
 
     # 8. flavors
-    result = runner.invoke(vm.vm_group, ["flavor"])
+    print_header("Fetching Chameleon flavors...")
+    with StopWatch.timer("chameleon_flavors"):
+        result = runner.invoke(vm.vm_group, ["flavor"])
+    print_debug_info("Chameleon flavors output:", result)
     if result.exit_code != 0:
         print(f"DEBUG: Chameleon flavors failed with output: {result.output}")
         pytest.skip("Chameleon flavors failed")
@@ -79,22 +109,34 @@ def test_chameleon_cli_lifecycle(runner):
     #    pytest.skip("Chameleon key list --all failed")
 
     # 11. keys upload
-    result = runner.invoke(vm.vm_group, ["key", "upload", "~/.ssh/id_rsa.pub", "--name", "smoke-key"])
+    print_header("Uploading SSH key to Chameleon...")
+    with StopWatch.timer("chameleon_key_upload"):
+        result = runner.invoke(vm.vm_group, ["key", "upload", "~/.ssh/id_rsa.pub", "--name", "smoke-key"])
+    print_debug_info("Chameleon key upload output:", result)
     if result.exit_code != 0:
         pytest.skip("Chameleon key upload failed")
 
     # 12. keys delete
-    result = runner.invoke(vm.vm_group, ["key", "delete", "smoke-key"])
+    print("Deleting SSH key from Chameleon...")
+    with StopWatch.timer("chameleon_key_delete"):
+        result = runner.invoke(vm.vm_group, ["key", "delete", "smoke-key"])
+    print_debug_info("Chameleon key delete output:", result)
     if result.exit_code != 0:
         pytest.skip("Chameleon key delete failed")
 
     # 13. security_groups
-    result = runner.invoke(vm.vm_group, ["security_groups"])
+    print_header("Fetching Chameleon security groups...")
+    with StopWatch.timer("chameleon_security_groups"):
+        result = runner.invoke(vm.vm_group, ["security-group"])
+    print_debug_info("Chameleon security_groups output:", result)
     if result.exit_code != 0:
-        pytest.skip("Chameleon security_groups failed")
+        pytest.skip("Chameleon security-group failed")
 
     # 14. ssh_config
-    result = runner.invoke(vm.vm_group, ["ssh_config"])
+    print_header("Fetching Chameleon SSH config...")
+    with StopWatch.timer("chameleon_ssh_config"):
+        result = runner.invoke(vm.vm_group, ["ssh-config"])
+    print_debug_info("Chameleon ssh_config output:", result)
     assert result.exit_code == 0
 
     # 15. reservation
