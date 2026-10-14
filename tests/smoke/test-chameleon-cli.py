@@ -2,9 +2,9 @@ import pytest
 import uuid
 from click.testing import CliRunner
 from cloudmesh.ai.command import vm
-from tests.smoke.cli_helper import setup_cli_config, print_header, print_debug_info
-from tests.smoke.benchmark_helper import save_benchmark
-from cloudmesh.ai.common.stopwatch import StopWatch
+from tests.smoke.cli_helper import setup_cli_config, cli_step
+from tests.smoke.benchmark_helper import save_benchmark, create_benchmark_payload, get_results_username
+import json
 from pprint import pprint
 
 @pytest.fixture
@@ -15,33 +15,34 @@ def test_chameleon_cli_lifecycle(runner):
     """
     Smoke test for Chameleon CLI lifecycle.
     """
+    try:
+        username = get_results_username(config_path=None)
+    except Exception:
+        username = "smoke_test_user"
+
     # 1. providers
 
-    print_header("Fetching Provider List")
-    with StopWatch.timer("chameleon_provider_list"):
+    with cli_step("Fetching Provider List", timer_name="chameleon_provider_list") as step:
         result = runner.invoke(vm.vm_group, ["provider", "list"])
-    print_debug_info("Provider list output:", result)
+        step.debug("Provider list output:", result)
 
     assert result.exit_code == 0
     assert "chameleon" in result.output.lower()
 
 
     # 2. set
-    print_header("Setting up CLI config for Chameleon...")
-    with StopWatch.timer("chameleon_provider_set"):
+    with cli_step("Setting up CLI config for Chameleon...", timer_name="chameleon_provider_set") as step:
         result = runner.invoke(vm.vm_group, ["provider", "set", "chameleon"])
-    print_debug_info("Provider set output:", result)
+        step.debug("Provider set output:", result)
     assert result.exit_code == 0
 
 
     # 3. start
-    print_header("Starting a new Chameleon VM...")
-    vm_name = f"smoke-chameleon-vm-{uuid.uuid4().hex[:6]}"
-    with StopWatch.timer("chameleon_start"):
+    with cli_step("Starting a new Chameleon VM...", timer_name="chameleon_start") as step:
+        vm_name = f"{username}-smoke-chameleon-vm-{uuid.uuid4().hex[:6]}"
         result = runner.invoke(vm.vm_group, ["start", vm_name])
-    print_debug_info("Chameleon start output:", result)
+        step.debug("Chameleon start output:", result)
     if result.exit_code != 0:
-        print(f"DEBUG: Chameleon start failed with output: {result.output}")
         pytest.skip(f"Chameleon start failed: {result.output}")
 
 
@@ -58,44 +59,38 @@ def test_chameleon_cli_lifecycle(runner):
                 break
 
     # 4. list
-    print_header(f"Checking if VM {vm_name} is in the list...")
-    with StopWatch.timer("chameleon_list"):
+    with cli_step(f"Checking if VM {vm_name} is in the list...", timer_name="chameleon_list") as step:
         result = runner.invoke(vm.vm_group, ["list"])
-    print_debug_info("Chameleon list output:", result)
+        step.debug("Chameleon list output:", result)
     assert result.exit_code == 0
     assert vm_name in result.output
 
     # 5. stop
-    print(f"Stopping VM {vm_name}...")
-    with StopWatch.timer("chameleon_stop"):
+    with cli_step(f"Stopping VM {vm_name}...", timer_name="chameleon_stop") as step:
         result = runner.invoke(vm.vm_group, ["stop", vm_name])
-    print_debug_info("Chameleon stop output:", result)
+        step.debug("Chameleon stop output:", result)
     if result.exit_code != 0:
         pytest.skip("Chameleon stop failed")
 
     # 6. delete
-    print_header(f"Deleting VM {vm_name}...")
-    with StopWatch.timer("chameleon_delete"):
+    with cli_step(f"Deleting VM {vm_name}...", timer_name="chameleon_delete") as step:
         result = runner.invoke(vm.vm_group, ["delete", vm_name])
-    print_debug_info("Chameleon delete output:", result)
+        step.debug("Chameleon delete output:", result)
     if result.exit_code != 0:
         pytest.skip("Chameleon delete failed")
 
     # 7. images
-    print("Fetching Chameleon images...")
-    with StopWatch.timer("chameleon_images"):
+    with cli_step("Fetching Chameleon images...", timer_name="chameleon_images") as step:
         result = runner.invoke(vm.vm_group, ["image"])
-    print_debug_info("Chameleon images output:", result)
+        step.debug("Chameleon images output:", result)
     if result.exit_code != 0:
         pytest.skip("Chameleon images failed")
 
     # 8. flavors
-    print_header("Fetching Chameleon flavors...")
-    with StopWatch.timer("chameleon_flavors"):
+    with cli_step("Fetching Chameleon flavors...", timer_name="chameleon_flavors") as step:
         result = runner.invoke(vm.vm_group, ["flavor"])
-    print_debug_info("Chameleon flavors output:", result)
+        step.debug("Chameleon flavors output:", result)
     if result.exit_code != 0:
-        print(f"DEBUG: Chameleon flavors failed with output: {result.output}")
         pytest.skip("Chameleon flavors failed")
 
     ## 9. keys list
@@ -109,43 +104,53 @@ def test_chameleon_cli_lifecycle(runner):
     #    pytest.skip("Chameleon key list --all failed")
 
     # 11. keys upload
-    print_header("Uploading SSH key to Chameleon...")
-    with StopWatch.timer("chameleon_key_upload"):
+    with cli_step("Uploading SSH key to Chameleon...", timer_name="chameleon_key_upload") as step:
         result = runner.invoke(vm.vm_group, ["key", "upload", "~/.ssh/id_rsa.pub", "--name", "smoke-key"])
-    print_debug_info("Chameleon key upload output:", result)
+        step.debug("Chameleon key upload output:", result)
     if result.exit_code != 0:
         pytest.skip("Chameleon key upload failed")
 
     # 12. keys delete
-    print("Deleting SSH key from Chameleon...")
-    with StopWatch.timer("chameleon_key_delete"):
+    with cli_step("Deleting SSH key from Chameleon...", timer_name="chameleon_key_delete") as step:
         result = runner.invoke(vm.vm_group, ["key", "delete", "smoke-key"])
-    print_debug_info("Chameleon key delete output:", result)
+        step.debug("Chameleon key delete output:", result)
     if result.exit_code != 0:
         pytest.skip("Chameleon key delete failed")
 
     # 13. security_groups
-    print_header("Fetching Chameleon security groups...")
-    with StopWatch.timer("chameleon_security_groups"):
+    with cli_step("Fetching Chameleon security groups...", timer_name="chameleon_security_groups") as step:
         result = runner.invoke(vm.vm_group, ["security-group"])
-    print_debug_info("Chameleon security_groups output:", result)
+        step.debug("Chameleon security_groups output:", result)
     if result.exit_code != 0:
         pytest.skip("Chameleon security-group failed")
 
     # 14. ssh_config
-    print_header("Fetching Chameleon SSH config...")
-    with StopWatch.timer("chameleon_ssh_config"):
+    with cli_step("Fetching Chameleon SSH config...", timer_name="chameleon_ssh_config") as step:
         result = runner.invoke(vm.vm_group, ["ssh-config"])
-    print_debug_info("Chameleon ssh_config output:", result)
+        step.debug("Chameleon ssh_config output:", result)
     assert result.exit_code == 0
 
     # 15. reservation
     # Try to create a reservation
-    #result = runner.invoke(vm.vm_group, ["reservation", "smoke-res", "--node-type", "gpu", "--count", "1"])
-    #if result.exit_code != 0:
-    #    pytest.skip("Chameleon reservation failed")
+    with cli_step("Creating a Chameleon reservation...", timer_name="chameleon_reservation") as step:
+        res_name = f"{username}-smoke-res"
+        result = runner.invoke(vm.vm_group, ["reservation", res_name, "--node-type", "gpu", "--count", "1"])
+        step.debug("Chameleon reservation output:", result)
+    if result.exit_code != 0:
+        pytest.skip("Chameleon reservation failed")
 
     # Note: In CLI tests, we don't have a direct temp_config path like in lifecycle tests.
     # We use a dummy path or try to find the config path from setup_cli_config.
     # For now, we'll use a placeholder as the benchmark_helper might just need it for the username.
     save_benchmark(tag="Chameleon CLI", config_path=None)
+
+    try:
+        username = get_results_username(config_path=None)
+    except Exception:
+        username = "smoke_test_user"
+
+    payload = create_benchmark_payload(
+        benchmark_name="Chameleon CLI",
+        user=username
+    )
+    print(json.dumps(payload, indent=2))
