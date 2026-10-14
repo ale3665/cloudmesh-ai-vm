@@ -398,11 +398,18 @@ class KeyManager:
         """
         keys = self.get_github_keys()
         for k in keys:
-            local_path = self.find_key_path(k.get("key", ""))
-            k["local_path"] = local_path if local_path else "Not found"
+            path_result = self.find_key_path(k.get("key", ""))
+            local_path = path_result if path_result else "Not found"
+            k["local_path"] = local_path
 
             # Calculate fingerprints from the public key material
             k["md5"] = self.get_ssh_key_md5_fingerprint(k.get("key", ""))
             k["sha256"] = self.get_ssh_key_sha256_fingerprint(k.get("key", ""))
+
+            # Check if the local key has a passphrase
+            if path_result:
+                k["passkey"] = "Yes" if self._has_passphrase(Path(path_result)) else "No"
+            else:
+                k["passkey"] = "N/A"
 
         return keys
