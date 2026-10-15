@@ -29,7 +29,18 @@ def scan(as_json: bool):
         path = k["path"]
         if path.startswith(home):
             path = path.replace(home, "~", 1)
-        rows.append([path, k["type"], f"{k['sha256']} ({k['md5']})", "Yes" if k["has_passphrase"] else "No"])
+        passphrase_status = (
+            "Yes" if k["has_passphrase"] is True
+            else "No" if k["has_passphrase"] is False
+            else "Unknown"
+        )
+
+        rows.append([
+            path,
+            k["type"],
+            f"{k['sha256']} ({k['md5']})",
+            passphrase_status,
+        ])
 
     render_table("Local SSH Keys", ["Path", "Type", "Fingerprint (SHA256 / MD5)", "Passphrase"], rows)
 

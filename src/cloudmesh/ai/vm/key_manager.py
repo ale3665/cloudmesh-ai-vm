@@ -118,24 +118,43 @@ class KeyManager:
         if "dsa" in name: return "dsa"
         return "unknown"
 
-    def _has_passphrase(self, key_path: Path) -> bool:
+    def _has_passphrase(self, key_path: Path) -> Optional[bool]:
         """
-        Checks if a private key is protected by a passphrase.
+        Determine whether an SSH private key requires a passphrase.
+
+        True: recognized incorrect-passphrase error.
+        False: key can be read with an empty passphrase.
+        None: status cannot be determined.
         """
         try:
             result = subprocess.run(
-                ["ssh-keygen", "-y", "-f", str(key_path)],
+                ["ssh-keygen", "-y", "-P", "", "-f", str(key_path)],
                 capture_output=True,
                 text=True,
                 timeout=5,
-                stdin=subprocess.DEVNULL
+                stdin=subprocess.DEVNULL,
             )
-            if result.returncode != 0:
+
+            if result.returncode == 0:
+                return False
+
+            if "incorrect passphrase" in result.stderr.lower():
                 return True
-            return False
+
+            logger.warning(
+                "Unable to determine passphrase status for %s: %s",
+                key_path,
+                result.stderr.strip(),
+            )
+            return None
+
         except Exception as e:
-            logger.debug(f"Error checking passphrase for {key_path}: {e}")
-            return False
+            logger.warning(
+                "Unable to determine passphrase status for %s: %s",
+                key_path,
+                e,
+            )
+            return None
 
     def get_github_keys(self) -> List[Dict[str, Any]]:
         """
