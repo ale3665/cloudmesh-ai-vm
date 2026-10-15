@@ -1,4 +1,5 @@
 import click
+import json
 from cloudmesh.ai.command._shared.context import console, get_active_provider
 from cloudmesh.ai.command._shared.exceptions import handle_errors
 from cloudmesh.ai.command._shared.ui import render_table
@@ -43,7 +44,6 @@ def list_keys(ctx: click.Context, all: bool, as_json: bool):
                 console.print(f"Could not list keys for provider {cloud_name}: {e}")
 
         if as_json:
-            import json
             console.print(json.dumps(all_results, indent=2))
         elif not any_keys:
             console.print("No SSH keys found on any enabled providers.")
@@ -53,7 +53,6 @@ def list_keys(ctx: click.Context, all: bool, as_json: bool):
     keys = provider.get_keys()
     if keys:
         if as_json:
-            import json
             console.print(json.dumps(keys, indent=2))
         else:
             render_table("SSH Keys", ["Name", "Fingerprint"], [[k.get("name"), k.get("fingerprint", "N/A")] for k in keys])
