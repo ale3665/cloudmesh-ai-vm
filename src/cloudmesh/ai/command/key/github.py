@@ -62,11 +62,10 @@ def list(as_json: bool):
             k.get("created_at", "N/A"),
             k.get("last_used", "N/A"),
             "Yes" if k.get("verified") else "No",
-            k.get("local_path", "N/A"),
-            k.get("passkey", "N/A")
+            k.get("local_path", "N/A")
         ])
 
-    render_table("GitHub SSH Keys", ["Name", "Type", "SHA256 Fingerprint", "MD5 Fingerprint", "Created At", "Last Used", "Verified", "Local Path", "Passkey"], rows)
+    render_table("GitHub SSH Keys", ["Name", "Type", "SHA256 Fingerprint", "MD5 Fingerprint", "Created At", "Last Used", "Verified", "Local Path"], rows)
 
 @github.command()
 @click.option("--json", "as_json", is_flag=True, help="Output in JSON format")
