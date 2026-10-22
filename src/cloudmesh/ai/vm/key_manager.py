@@ -2,8 +2,13 @@ import os
 import subprocess
 import logging
 import json
+import base64
+import hashlib
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+
+from paramiko import PKey
+from paramiko.ssh_exception import PasswordRequiredException
 
 logger = logging.getLogger("cloudmesh.ai.vm")
 
@@ -16,6 +21,60 @@ class KeyManager:
 
     def __init__(self):
         self.ssh_dir = Path.home() / ".ssh"
+
+    def get_ssh_key_md5_fingerprint(self, key_string: str) -> str:
+        """
+        Derives the classic MD5 fingerprint of an SSH public key
+        (equivalent to `ssh-keygen -E md5 -lf`).
+        """
+        try:
+            parts = key_string.strip().split()
+            if len(parts) < 2:
+                return "N/A"
+
+            # Extract the base64-encoded key data part
+            key_data_b64 = parts[1]
+
+            # Decode the base64 data into raw binary bytes
+            key_bytes = base64.b64decode(key_data_b64)
+
+            # Compute MD5 hash of the raw bytes
+            md5_hash = hashlib.md5(key_bytes).hexdigest()
+
+            # Format with colons to match standard ssh-keygen output (e.g., ab:cd:ef...)
+            return ":".join(md5_hash[i:i+2] for i in range(0, len(md5_hash), 2))
+
+        except Exception as e:
+            logger.debug(f"Error computing MD5 fingerprint: {e}")
+            return "N/A"
+
+    def get_ssh_key_sha256_fingerprint(self, key_string: str) -> str:
+        """
+        Derives the modern SHA256 fingerprint of an SSH public key
+        (equivalent to `ssh-keygen -lf`).
+        """
+        try:
+            parts = key_string.strip().split()
+            if len(parts) < 2:
+                return "N/A"
+
+            # Extract the base64-encoded key data part
+            key_data_b64 = parts[1]
+
+            # Decode the base64 data into raw binary bytes
+            key_bytes = base64.b64decode(key_data_b64)
+
+            # Compute SHA256 hash of the raw bytes
+            sha256_digest = hashlib.sha256(key_bytes).digest()
+
+            # Encode to base64 and strip trailing '=' padding per OpenSSH convention
+            fingerprint_b64 = base64.b64encode(sha256_digest).decode('utf-8').rstrip('=')
+
+            return f"SHA256:{fingerprint_b64}"
+
+        except Exception as e:
+            logger.debug(f"Error computing SHA256 fingerprint: {e}")
+            return "N/A"
 
     def get_fingerprints(self, key_path: str) -> Dict[str, str]:
         """
@@ -76,15 +135,45 @@ class KeyManager:
                 key_type = self._get_key_type(file)
                 has_passphrase = self._has_passphrase(file)
                 fps = self.get_fingerprints(str(file))
+                comment = self._get_key_comment(file)
                 keys.append({
                     "path": str(file),
                     "type": key_type,
                     "sha256": fps["sha256"],
                     "md5": fps["md5"],
+                    "comment": comment,
                     "has_passphrase": has_passphrase
                 })
 
         return keys
+
+    def _get_key_comment(self, key_path: Path) -> str:
+        """
+        Extracts the comment from the public key associated with the private key.
+        """
+        try:
+            pub_file = key_path.with_suffix(key_path.suffix + ".pub")
+            if pub_file.exists():
+                pub_line = pub_file.read_text().strip().splitlines()[0]
+                parts = pub_line.split()
+                if len(parts) >= 3:
+                    return " ".join(parts[2:])
+
+            pub_out = subprocess.run(
+                ["ssh-keygen", "-y", "-f", str(key_path)],
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL
+            )
+            if pub_out.returncode == 0:
+                pub_line = pub_out.stdout.strip().splitlines()[0]
+                parts = pub_line.split()
+                if len(parts) >= 3:
+                    return " ".join(parts[2:])
+        except Exception as e:
+            logger.debug(f"Error getting comment for {key_path}: {e}")
+
+        return "N/A"
 
     def _get_key_type(self, key_path: Path) -> str:
         """
@@ -122,29 +211,30 @@ class KeyManager:
         """
         Determine whether an SSH private key requires a passphrase.
 
-        True: recognized incorrect-passphrase error.
-        False: key can be read with an empty passphrase.
-        None: status cannot be determined.
+        True: the key requires a passphrase.
+        False: the key can be read without a passphrase.
+        None: the status cannot be determined.
         """
         try:
-            result = subprocess.run(
-                ["ssh-keygen", "-y", "-P", "", "-f", str(key_path)],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                stdin=subprocess.DEVNULL,
-            )
+            PKey.from_path(key_path)
+            return False
 
-            if result.returncode == 0:
-                return False
+        except PasswordRequiredException:
+            return True
 
-            if "incorrect passphrase" in result.stderr.lower():
+        except TypeError as e:
+            message = str(e).lower()
+
+            if (
+                "password-protected" in message
+                or "password was not provided" in message
+            ):
                 return True
 
             logger.warning(
                 "Unable to determine passphrase status for %s: %s",
                 key_path,
-                result.stderr.strip(),
+                e,
             )
             return None
 
@@ -278,8 +368,64 @@ class KeyManager:
         except FileNotFoundError:
             return {"success": False, "error": "GitHub CLI ('gh') not found. Please install it."}
 
+    def find_key_path(self, public_key: str) -> Optional[str]:
+        """
+        Attempts to find a local private key that matches the given public key material.
+        """
+        if not public_key:
+            return None
+
+        # Normalize the public key material (remove type prefix if present)
+        parts = public_key.split()
+        material = parts[1] if len(parts) >= 2 else public_key
+
+        # 1. First, try matching against existing .pub files (fastest and doesn't require passphrases)
+        for file in self.ssh_dir.iterdir():
+            if file.suffix == ".pub":
+                try:
+                    if material in file.read_text():
+                        # Return the path to the private key (remove .pub extension)
+                        return str(file.with_suffix(""))
+                except Exception:
+                    continue
+
+        # 2. Fallback: try generating public keys from private keys
+        for file in self.ssh_dir.iterdir():
+            if file.suffix == ".pub":
+                continue
+
+            is_common_name = any(file.name.startswith(name) for name in self.COMMON_KEY_NAMES)
+            is_pem = file.suffix == ".pem"
+            if not (is_common_name or is_pem):
+                continue
+
+            try:
+                pub_out = subprocess.run(
+                    ["ssh-keygen", "-y", "-f", str(file)],
+                    capture_output=True,
+                    text=True,
+                    stdin=subprocess.DEVNULL
+                )
+                if pub_out.returncode == 0:
+                    generated_pub = pub_out.stdout.strip()
+                    if material in generated_pub:
+                        return str(file)
+            except Exception:
+                continue
+
+        return None
+
     def github_list(self) -> List[Dict[str, Any]]:
         """
-        Lists the SSH keys currently configured in GitHub.
+        Lists the SSH keys currently configured in GitHub and identifies their local paths.
         """
-        return self.get_github_keys()
+        keys = self.get_github_keys()
+        for k in keys:
+            local_path = self.find_key_path(k.get("key", ""))
+            k["local_path"] = local_path if local_path else "Not found"
+
+            # Calculate fingerprints from the public key material
+            k["md5"] = self.get_ssh_key_md5_fingerprint(k.get("key", ""))
+            k["sha256"] = self.get_ssh_key_sha256_fingerprint(k.get("key", ""))
+
+        return keys

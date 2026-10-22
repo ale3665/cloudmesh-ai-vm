@@ -1,51 +1,83 @@
 from pathlib import Path
 from unittest.mock import patch
-import subprocess
 
 from cloudmesh.ai.vm.key_manager import KeyManager
 
 
-def test_passphrase_protected_key():
-    """An encrypted key must be identified as passphrase-protected."""
-    with patch("cloudmesh.ai.vm.key_manager.subprocess.run") as mock_run:
-        mock_run.return_value = subprocess.CompletedProcess(
-            args=[], returncode=255, stdout="", stderr="incorrect passphrase"
+def test_has_passphrase_false_for_unprotected_key():
+    """An unprotected private key should not require a passphrase."""
+    manager = KeyManager()
+    key_path = Path("id_ed25519")
+
+    with patch(
+        "cloudmesh.ai.vm.key_manager.PKey.from_path"
+    ) as from_path:
+        from_path.return_value = object()
+
+        result = manager._has_passphrase(key_path)
+
+    assert result is False
+    from_path.assert_called_once_with(key_path)
+
+
+def test_has_passphrase_true_for_password_protected_key():
+    """A password-protected private key should be detected."""
+    manager = KeyManager()
+    key_path = Path("id_ed25519")
+
+    with patch(
+        "cloudmesh.ai.vm.key_manager.PKey.from_path"
+    ) as from_path:
+        from_path.side_effect = TypeError(
+            "Key is password-protected, but password was not provided."
         )
 
-        result = KeyManager()._has_passphrase(Path("/tmp/test_encrypted_key"))
+        result = manager._has_passphrase(key_path)
 
-        assert result is True
-        mock_run.assert_called_once_with(
-            ["ssh-keygen", "-y", "-P", "", "-f", "/tmp/test_encrypted_key"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            stdin=subprocess.DEVNULL,
+    assert result is True
+    from_path.assert_called_once_with(key_path)
+
+
+def test_has_passphrase_unknown_for_unrelated_parse_error():
+    """Unrelated parsing errors should produce an unknown status."""
+    manager = KeyManager()
+    key_path = Path("invalid_key")
+
+    with patch(
+        "cloudmesh.ai.vm.key_manager.PKey.from_path"
+    ) as from_path:
+        from_path.side_effect = ValueError("Invalid private key")
+
+        result = manager._has_passphrase(key_path)
+
+    assert result is None
+
+
+def test_has_passphrase_true_for_password_required_exception():
+    """A key requiring a password must be classified as protected."""
+    from paramiko.ssh_exception import PasswordRequiredException
+
+    manager = KeyManager()
+    key_path = Path("id_ed25519")
+
+    with patch("cloudmesh.ai.vm.key_manager.PKey.from_path") as from_path:
+        from_path.side_effect = PasswordRequiredException(
+            "Private key file is encrypted"
         )
+        result = manager._has_passphrase(key_path)
+
+    assert result is True
+    from_path.assert_called_once_with(key_path)
 
 
-def test_unprotected_key():
-    """An unencrypted key must not be identified as passphrase-protected."""
-    with patch("cloudmesh.ai.vm.key_manager.subprocess.run") as mock_run:
-        mock_run.return_value = subprocess.CompletedProcess(
-            args=[], returncode=0, stdout="ssh-ed25519 AAAA...", stderr=""
-        )
+def test_has_passphrase_unknown_for_unrelated_type_error():
+    """Unexpected TypeError must not classify a key as unprotected."""
+    manager = KeyManager()
+    key_path = Path("invalid_key")
 
-        result = KeyManager()._has_passphrase(Path("/tmp/test_unencrypted_key"))
+    with patch("cloudmesh.ai.vm.key_manager.PKey.from_path") as from_path:
+        from_path.side_effect = TypeError("Unsupported key format")
+        result = manager._has_passphrase(key_path)
 
-        assert result is False
-
-
-def test_missing_key_returns_unknown():
-    """A missing key must not be classified as passphrase-protected."""
-    with patch("cloudmesh.ai.vm.key_manager.subprocess.run") as mock_run:
-        mock_run.return_value = subprocess.CompletedProcess(
-            args=[],
-            returncode=255,
-            stdout="",
-            stderr="/tmp/missing_key: No such file or directory",
-        )
-
-        result = KeyManager()._has_passphrase(Path("/tmp/missing_key"))
-
-        assert result is None
+    assert result is None
+    from_path.assert_called_once_with(key_path)

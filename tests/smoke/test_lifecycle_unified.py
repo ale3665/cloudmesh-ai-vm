@@ -8,9 +8,11 @@ import shutil
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Callable
 
+
 from cloudmesh.ai.vm.state_manager import StateManager
 from cloudmesh.ai.vm.factory import factory
 from cloudmesh.ai.common.stopwatch import StopWatch
+from tests.integration.test_wsl2_with_credentials import provider
 from tests.smoke.benchmark_helper import save_benchmark
 
 # Import Providers for registration
@@ -20,6 +22,8 @@ from src.cloudmesh.ai.vm.local.LimaManager import Provider as LimaProvider
 from src.cloudmesh.ai.vm.local.MultipassManager import Provider as MultipassProvider
 from src.cloudmesh.ai.vm.local.VBoxManager import Provider as VBoxProvider
 from src.cloudmesh.ai.vm.local.Wsl2Manager import Provider as Wsl2Provider
+
+from cloudmesh.ai.common.dotdict import DotDict
 
 @dataclass
 class ProviderTestConfig:
@@ -40,15 +44,32 @@ def verify_connectivity_run_command(provider, vm_name):
     hostname = provider.run_command(vm_name, "hostname")
     return hostname is not None and "Error" not in hostname
 
-def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path):
-    # This is for providers that might not have run_command but have _execute_ssh_command
+def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path, retries=12, delay=10):
+    import time
     info = provider.info(vm_name)
     ip = info.get("FloatingIP") or info.get("ip") or info.get("address")
     if not ip:
         return False
-    user = provider.get_cloud_config(provider.cloud_name).get("user", "ubuntu")
-    hostname = provider._execute_ssh_command(ip, user, priv_key_path, "hostname")
-    return "Error" not in hostname
+    user = provider.get_cloud_config(provider.cloud_name).get("username", "ubuntu")
+    
+    for attempt in range(retries):
+        hostname = provider._execute_ssh_command(ip, user, priv_key_path, "hostname")
+        if hostname and "Error" not in hostname:
+            return True
+        print(f"SSH service not ready yet (attempt {attempt+1}/{retries}), waiting {delay}s...")
+        time.sleep(delay)
+        
+    return False
+
+# def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path):
+#     # This is for providers that might not have run_command but have _execute_ssh_command
+#     info = provider.info(vm_name)
+#     ip = info.get("FloatingIP") or info.get("ip") or info.get("address")
+#     if not ip:
+#         return False
+#     user = provider.get_cloud_config(provider.cloud_name).get("user", "ubuntu")
+#     hostname = provider._execute_ssh_command(ip, user, priv_key_path, "hostname")
+#     return "Error" not in hostname
 
 def verify_connectivity_multipass_exec(provider, vm_name):
     # Multipass uses a specific CLI execution
@@ -81,13 +102,30 @@ def verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, strategy
 
     return False
 
-# --- Provider Configuration Map ---
+import yaml
+from pprint import pprint
+from cloudmesh.ai.common.util import path_expand
+
+# Open the file normally, then pass it to yaml.load with the Loader argument
+with open(path_expand("~/.config/cloudmesh/clouds.yaml"), "r", encoding="utf-8") as file:
+    data = yaml.load(file, Loader=yaml.FullLoader)
+
+# Now 'data' is a standard Python dictionary
+pprint(data)
+
+config = DotDict(data)
+
+
 
 PROVIDER_CONFIGS = [
     ProviderTestConfig(
         name="chameleon",
         provider_class=ChameleonProvider,
-        cloud_config={"image": "ubuntu-22.04", "flavor": "m1.small"},
+        cloud_config={"image":  config.clouds.chameleon.image, 
+                      "flavor": config.clouds.chameleon.flavor,
+                      "username": config.clouds.chameleon.username, 
+                      "key_name": config.clouds.chameleon.key_name,
+                      "key_path": config.clouds.chameleon.key_path},
         running_status="active",
         stopped_status="stopped",
         connectivity_strategy="ssh_execute"
@@ -160,9 +198,11 @@ def create_temp_config(tmp_path, provider_cfg):
     config_file = config_dir / "clouds.yaml"
 
     config_data = {
-        "username": "smoke_test_user",
         "clouds": {
-            provider_cfg.name: provider_cfg.cloud_config
+            provider_cfg.name: {
+                "username": "smoke_test_user",
+                **provider_cfg.cloud_config
+            }
         }
     }
 
@@ -207,8 +247,15 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
 
     # VM Name generation
     cloud_config = provider.get_cloud_config(provider_cfg.name)
-    username = cloud_config.get("username", "user").replace("_", "-")
-    vm_name = f"smoke-{provider_cfg.name}-{username}-{uuid.uuid4().hex[:6]}"
+    image_name = cloud_config.get("image", "")
+    
+    if image_name.startswith("CC"):
+        raw_username = "cc"
+    else:
+        raw_username = cloud_config.get("username", "user")
+
+    username = raw_username.replace("_", "-")
+    vm_name = f"smoke-lifecycle-{username}-{uuid.uuid4().hex[:6]}"
 
     try:
         # 0. Cleanup
