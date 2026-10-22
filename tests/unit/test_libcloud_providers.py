@@ -127,18 +127,32 @@ class TestLibcloudProviders:
             assert vms[0]["Name"] == "test-vm"
 
     def test_unsupported_methods(self, mock_driver):
-        # Create a node mock that explicitly lacks the suspend/reboot methods
-        # Using spec=[] ensures that hasattr() returns False for any attribute
-        mock_node = MagicMock(spec=[])
-        mock_driver.get_node.return_value = mock_node
-
-        with patch("cloudmesh.ai.vm.aws.AwsManager.AmazonEC2Driver", return_value=mock_driver):
+        with patch(
+            "cloudmesh.ai.vm.aws.AwsManager.AmazonEC2Driver",
+            return_value=mock_driver,
+        ):
             provider = AwsProvider(MOCK_CONFIG)
-            with pytest.raises(ProviderFeatureNotSupported):
-                provider.suspend(name="test-vm")
+
+            # AWS suspend is supported by mapping it to stop().
+            with patch.object(
+                provider,
+                "stop",
+                return_value=True,
+            ) as mock_stop:
+                assert provider.suspend(name="test-vm") is True
+                mock_stop.assert_called_once_with("test-vm")
+
+            # Restart should raise ProviderFeatureNotSupported only when
+            # neither the node nor the driver provides reboot support.
+            mock_node = MagicMock(spec=[])
+
+            limited_driver = MagicMock(spec=["get_node"])
+            limited_driver.get_node.return_value = mock_node
+
+            provider.driver = limited_driver
+
             with pytest.raises(ProviderFeatureNotSupported):
                 provider.restart(name="test-vm")
-
     def test_missing_config(self):
         incomplete_config = {"clouds": {"aws": {}}}
         with patch("cloudmesh.ai.vm.aws.AwsManager.AmazonEC2Driver", return_value=MagicMock()):

@@ -2,7 +2,8 @@ import os
 import click
 import importlib
 from click.testing import CliRunner
-from cloudmesh.ai.command.vm import cmx, vm_group, load_commands_recursively
+from cloudmesh.ai.command import cmx
+from cloudmesh.ai.command.vm import vm_group, load_commands_recursively
 
 def test_dynamic_command_discovery():
     """

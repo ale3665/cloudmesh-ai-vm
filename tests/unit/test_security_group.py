@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 from click.testing import CliRunner
-from cloudmesh.ai.command.vm import cmx
+from cloudmesh.ai.command import cmx
 
 def test_security_group_preset_failure_cleans_up_partial_group():
     """

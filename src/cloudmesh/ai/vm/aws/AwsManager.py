@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Optional
 import subprocess
 from cloudmesh.ai.vm.LibcloudManager import LibcloudManager
+from cloudmesh.ai.vm.exceptions import ProviderFeatureNotSupported
 
 try:
     from libcloud.compute.providers.amazon import AmazonEC2Driver

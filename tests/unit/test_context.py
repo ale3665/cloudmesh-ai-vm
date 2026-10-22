@@ -74,6 +74,11 @@ def test_resolve_vms_count(mock_get_provider, mock_ctx, mock_provider):
 def test_resolve_vms_last_vm(mock_state, mock_get_provider, mock_ctx, mock_provider):
     mock_get_provider.return_value = mock_provider
     mock_state.get_last_vm.return_value = "testuser-1"
+    mock_provider.cloud_name = "test-cloud"
+    mock_provider.info.return_value = {
+    "Name": "testuser-1",
+    "State": "active",
+    }
 
     # When no name, count, or range is provided, it should resolve to last VM
     assert resolve_vms(mock_ctx) == ["testuser-1"]

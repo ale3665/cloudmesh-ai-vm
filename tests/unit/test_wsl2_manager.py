@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
 import subprocess
 from cloudmesh.ai.vm.local.Wsl2Manager import Provider
 
@@ -80,12 +80,40 @@ def test_login(provider):
 
 def test_link_ssh_dir_success(provider):
     with patch.object(provider, "exists", return_value=True):
-        provider._run_command.return_value = MagicMock(stdout="Linked", returncode=0)
+        provider._run_command.return_value = MagicMock(
+            stdout="",
+            returncode=0,
+        )
+
         assert provider.link_ssh_dir(name="test-distro") is True
 
-        expected_cmd = "rm -rf /home/wsluser/.ssh && ln -s /mnt/c/Users/winuser/.ssh /home/wsluser/.ssh"
-        provider._run_command.assert_called_once_with(["wsl", "-d", "test-distro", "-u", "root", "sh", "-c", expected_cmd])
+        provider._run_command.assert_any_call(
+            [
+                "wsl",
+                "-d",
+                "test-distro",
+                "-u",
+                "root",
+                "sh",
+                "-c",
+                "[ -d /home/wsluser/.ssh ] && [ ! -L /home/wsluser/.ssh ] && echo 'exists'",
+            ]
+        )
 
+        provider._run_command.assert_any_call(
+            [
+                "wsl",
+                "-d",
+                "test-distro",
+                "-u",
+                "root",
+                "sh",
+                "-c",
+                "ln -sf /mnt/c/Users/winuser/.ssh /home/wsluser/.ssh",
+            ]
+        )
+
+        assert provider._run_command.call_count == 2
 def test_link_ssh_dir_missing_config(provider):
     provider.config = {"clouds": {"wsl2": {}}} # Empty config
     assert provider.link_ssh_dir(name="test-distro") is False
