@@ -17,6 +17,7 @@
 - **SSH Integration**: Generate suggested SSH configuration entries for existing VMs to enable seamless access via `ssh <hostname>`.
 - **Interactive Shell**: Enter a dedicated VM management shell using `cmx vm -i`.
 - **SDK Native**: OpenStack providers (Chameleon, Jetstream) are implemented using the official OpenStack SDK for maximum stability and feature support.
+- **Environment Diagnostics**: Use cmx vm doctor to validate provider requirements, configuration, and diagnostic information before running VM operations.
 
 The full documentation is available at: <https://cloudmesh-ai.github.io/cloudmesh-ai-vm/>
 
@@ -73,13 +74,53 @@ cmx vm -i
 
 ```
 
+## VM Doctor
+
+`cmx vm doctor` provides a non-destructive health check for the active VM provider. It helps detect missing dependencies, configuration problems, and provider availability issues before starting VM lifecycle operations.
+
+The command performs the following checks:
+- **Provider Resolution**: Verifies that the requested or configured provider can be loaded.
+- **Requirements**: Checks whether required local tools and provider dependencies are available.
+- **Configuration**: Runs provider configuration validation when supported.
+- **Provider Information**: Retrieves provider diagnostic information when local requirements are available.
+
+Run Doctor using the currently selected provider:
+`cmx vm doctor`
+
+Check a specific provider:
+```bash
+cmx vm doctor --cloud multipass
+cmx vm doctor --cloud aws
+cmx vm doctor --cloud openstack
+```
+
+For scripts, automated validation, or CI workflows, use strict mode:
+`cmx vm doctor --cloud multipass --strict`
+
+With `--strict`, Doctor returns exit code 1 when one or more required checks fail. A healthy provider returns exit code 0.
+
+Example:
+
+```bash
+VM Doctor: multipass
+
+Provider        PASS   Resolved provider: multipass
+Requirements    FAIL   One or more required provider tools are unavailable.
+Configuration   PASS   No configuration problems detected.
+Provider Info   SKIP   Skipped because provider requirements are unavailable.
+
+Doctor result: NEEDS ATTENTION
+```
+
+Doctor does not create, start, stop, restart, suspend, or delete virtual machines.
+
 ## Provider Support Matrix
 
 | Provider | Lifecycle (S/S/D) | Remote Exec (`run`) | Implementation Status |
 | :--- | :---: | :---: | :--- |
 | **Multipass** | ✅ | ✅ (Agent) | 🟢 |
 | **Lima** | ✅ | ✅ (Agent) | 🟢 |
-| **OpenStack** | ✅ | ✅ (SSH) | 🟢 (via Libcloud) |
+| **OpenStack** | ✅ | ✅ (SSH) | 🟢 (via OpenStack SDK) |
 | **WSL2** | ✅ | ✅ (Direct) | 🟢 |
 | **VirtualBox** | ✅ | ✅ (GuestCtrl) | 🟢 |
 | **AWS** | ✅ | ✅ (SSH) | 🟢 (via Libcloud) |
