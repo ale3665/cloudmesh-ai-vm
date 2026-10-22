@@ -207,10 +207,13 @@ class KeyManager:
         if "dsa" in name: return "dsa"
         return "unknown"
 
-    def _has_passphrase(self, key_path: Path) -> bool:
+    def _has_passphrase(self, key_path: Path) -> Optional[bool]:
         """
-        Checks whether a private key is protected by a passphrase
-        without triggering an interactive prompt.
+        Determine whether an SSH private key requires a passphrase.
+
+        True: the key requires a passphrase.
+        False: the key can be read without a passphrase.
+        None: the status cannot be determined.
         """
         try:
             PKey.from_path(key_path)
@@ -228,16 +231,20 @@ class KeyManager:
             ):
                 return True
 
-            logger.debug(
-                f"Error checking passphrase for {key_path}: {e}"
+            logger.warning(
+                "Unable to determine passphrase status for %s: %s",
+                key_path,
+                e,
             )
-            return False
+            return None
 
         except Exception as e:
-            logger.debug(
-                f"Error checking passphrase for {key_path}: {e}"
+            logger.warning(
+                "Unable to determine passphrase status for %s: %s",
+                key_path,
+                e,
             )
-            return False
+            return None
 
     def get_github_keys(self) -> List[Dict[str, Any]]:
         """
