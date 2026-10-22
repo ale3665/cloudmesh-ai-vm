@@ -1,12 +1,13 @@
 import click
 from typing import Optional
-from ._shared.context import get_active_provider, vm_options, resolve_vm_name
-from ._shared.exceptions import handle_errors, VMCommandError
+from cloudmesh.ai.command._shared.context import get_active_provider, vm_options, resolve_vm_name
+from cloudmesh.ai.command._shared.exceptions import handle_errors, VMCommandError
 
 @click.command()
 @click.argument("name", required=False)
 @vm_options
 @handle_errors
+@click.pass_context
 def login(ctx: click.Context, name: Optional[str] = None, **kwargs)-> None:    
     
     """

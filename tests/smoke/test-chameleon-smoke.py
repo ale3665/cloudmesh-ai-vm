@@ -24,7 +24,7 @@ def temp_config(tmp_path):
         "username": "smoke_test_user",
         "clouds": {
             "chameleon": {
-                "image": "ubuntu-22.04",
+                "image": "CC-Ubuntu22.04",
                 "flavor": "m1.small",
             }
         }
@@ -193,7 +193,7 @@ def test_chameleon_smoke(temp_config, ssh_key):
 
     finally:
         # Print the benchmark results
-        save_benchmark(tag=f"Chameleon Smoke {vm_name}", config_path=temp_config)
+        save_benchmark(tag="chameleon-smoke", config_path=temp_config)
 
         # Cleanup in case of failure
         try:

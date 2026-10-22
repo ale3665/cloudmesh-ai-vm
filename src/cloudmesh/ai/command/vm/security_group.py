@@ -1,9 +1,9 @@
 import click
 import requests
 from typing import Optional
-from ._shared.context import console, get_active_provider, vm_options
-from ._shared.exceptions import handle_errors, VMCommandError
-from ._shared.ui import render_table
+from cloudmesh.ai.command._shared.context import console, get_active_provider, vm_options
+from cloudmesh.ai.command._shared.exceptions import handle_errors, VMCommandError
+from cloudmesh.ai.command._shared.ui import render_table
 
 PRESETS = {
     "web-server": [
@@ -42,7 +42,7 @@ def resolve_cidr(cidr: str) -> str:
         return "10.0.0.0/8"  # Simplified internal range
     return cidr
 
-@click.group(invoke_without_command=True)
+@click.group(invoke_without_command=True, name="security-group")
 @click.pass_context
 @vm_options
 def security_group(ctx: click.Context, **kwargs):
