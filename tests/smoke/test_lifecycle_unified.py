@@ -154,15 +154,22 @@ def ssh_key(tmp_path):
     )
     return str(key_path), str(pub_key_path)
 
-def create_temp_config(tmp_path, provider_cfg):
+def create_temp_config(tmp_path, provider_cfg, pub_key_path=None):
     config_dir = tmp_path / ".config" / "cloudmesh"
     config_dir.mkdir(parents=True)
     config_file = config_dir / "clouds.yaml"
 
+    cloud_config = dict(provider_cfg.cloud_config)
+
+    if provider_cfg.name == "jetstream" and pub_key_path:
+        cloud_config["key_path"] = pub_key_path
+        cloud_config["key_name"] = f"smoke-launch-{uuid.uuid4().hex[:8]}"
+        cloud_config["user"] = "ubuntu"
+
     config_data = {
         "username": "smoke_test_user",
         "clouds": {
-            provider_cfg.name: provider_cfg.cloud_config
+            provider_cfg.name: cloud_config
         }
     }
 
@@ -184,7 +191,7 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
     priv_key_path, pub_key_path = ssh_key
 
     # Use the helper function to create config instead of a fixture
-    temp_config = create_temp_config(tmp_path, provider_cfg)
+    temp_config = create_temp_config(tmp_path, provider_cfg, pub_key_path)
     state = StateManager(temp_config)
 
     # Register and create provider
@@ -209,6 +216,11 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
     cloud_config = provider.get_cloud_config(provider_cfg.name)
     username = cloud_config.get("username", "user").replace("_", "-")
     vm_name = f"smoke-{provider_cfg.name}-{username}-{uuid.uuid4().hex[:6]}"
+    launch_key_name = (
+        cloud_config.get("key_name")
+        if provider_cfg.name == "jetstream"
+        else None
+    )
 
     try:
         # 0. Cleanup
@@ -216,6 +228,14 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
             provider.delete(vm_name)
         except Exception:
             pass
+
+        # Provision the temporary SSH key required to launch Jetstream.
+        if launch_key_name:
+            with StopWatch.timer(f"{provider_cfg.name}_launch_key"):
+                assert provider.upload_key(
+                    pub_key_path,
+                    launch_key_name
+                ) is True
 
         # 1. Start VM
         with StopWatch.timer(f"{provider_cfg.name}_start"):
@@ -283,6 +303,12 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
         print(f"\nSmoke test for {provider_cfg.name} passed successfully!")
 
     finally:
+        if launch_key_name:
+            try:
+                provider.delete_key(launch_key_name)
+            except Exception:
+                pass
+
         save_benchmark(tag=f"{provider_cfg.name}-smoke", config_path=temp_config)
         try:
             if provider.exists(vm_name):
