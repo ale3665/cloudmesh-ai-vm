@@ -95,7 +95,7 @@ PROVIDER_CONFIGS = [
     ProviderTestConfig(
         name="jetstream",
         provider_class=OpenstackManager,
-        cloud_config={"image": "ubuntu-22.04", "flavor": "m1.small"},
+        cloud_config={"image": "ubuntu-22.04", "flavor": "m3.tiny"},
         running_status="active",
         stopped_status="Stopped",
         connectivity_strategy="run_command",
