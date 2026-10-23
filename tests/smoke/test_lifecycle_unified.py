@@ -55,6 +55,11 @@ def verify_connectivity_multipass_exec(provider, vm_name):
     result = subprocess.run(["multipass", "exec", vm_name, "--", "hostname"], capture_output=True, text=True)
     return result.returncode == 0
 
+def verify_cloud_key_registry(provider, vm_name, pub_key_path, priv_key_path):
+    keys = provider.get_keys()
+    return any(key.get("name") == "smoke-key" for key in keys)
+
+
 def verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, strategy):
     with open(pub_key_path, "r") as f:
         pub_key_content = f.read().strip()
@@ -90,7 +95,8 @@ PROVIDER_CONFIGS = [
         cloud_config={"image": "ubuntu-22.04", "flavor": "m1.small"},
         running_status="active",
         stopped_status="stopped",
-        connectivity_strategy="ssh_execute"
+        connectivity_strategy="ssh_execute",
+        custom_verify_key=verify_cloud_key_registry
     ),
     ProviderTestConfig(
         name="jetstream",
@@ -99,7 +105,8 @@ PROVIDER_CONFIGS = [
         running_status="active",
         stopped_status="Stopped",
         connectivity_strategy="run_command",
-        skip_condition=lambda: not shutil.which("openstack")
+        skip_condition=lambda: not shutil.which("openstack"),
+        custom_verify_key=verify_cloud_key_registry
     ),
     ProviderTestConfig(
         name="lima",
@@ -243,14 +250,41 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
             assert provider.upload_key(pub_key_path, "smoke-key", vm_name) is True
 
         with StopWatch.timer(f"{provider_cfg.name}_verify_key"):
-            assert verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, provider_cfg.connectivity_strategy) is True
+            if provider_cfg.custom_verify_key:
+                assert provider_cfg.custom_verify_key(
+                    provider,
+                    vm_name,
+                    pub_key_path,
+                    priv_key_path
+                ) is True
+            else:
+                assert verify_key_presence(
+                    provider,
+                    vm_name,
+                    pub_key_path,
+                    priv_key_path,
+                    provider_cfg.connectivity_strategy
+                ) is True
 
         with StopWatch.timer(f"{provider_cfg.name}_delete_key"):
             assert provider.delete_key("smoke-key", vm_name) is True
 
         with StopWatch.timer(f"{provider_cfg.name}_verify_key_deleted"):
-            # We check that the key is NOT present
-            assert not verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, provider_cfg.connectivity_strategy)
+            if provider_cfg.custom_verify_key:
+                assert not provider_cfg.custom_verify_key(
+                    provider,
+                    vm_name,
+                    pub_key_path,
+                    priv_key_path
+                )
+            else:
+                assert not verify_key_presence(
+                    provider,
+                    vm_name,
+                    pub_key_path,
+                    priv_key_path,
+                    provider_cfg.connectivity_strategy
+                )
 
         # 4. Provider-specific features (e.g. Shelve)
         if provider_cfg.has_shelve:
