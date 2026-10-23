@@ -395,7 +395,7 @@ class Provider(CloudBaseManager):
             try:
                 # The chi.keypair.Keypair wrapper expects a path to a file, not the key content.
                 # To ensure the key is uploaded correctly, we use the filename.
-                chi.keypair.Keypair(keypair_public_key=key_filename, key_name=key_name)
+                chi.server.update_keypair(key_name, local_pub_key)
                 self.print(f"✅ Keypair {key_name} uploaded and ready")
             except Exception as e:
                 raise VMProviderError(f"Failed to upload keypair {key_name}: {e}")
