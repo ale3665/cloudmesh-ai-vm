@@ -1,8 +1,15 @@
+import builtins
 import os
 import re
-from typing import List, Dict, Any, Optional
+from typing import Any
+
+from cloudmesh.ai.vm.exceptions import (
+    VMProviderError,
+    VMResourceError,
+)
+
 from ..LocalBaseManager import LocalBaseManager
-from cloudmesh.ai.vm.exceptions import VMProviderError, ConfigError, VMResourceError, VMAuthError, VMNetworkError
+
 
 class Provider(LocalBaseManager):
     """
@@ -20,9 +27,17 @@ class Provider(LocalBaseManager):
         try:
             self._run_command(["limactl", "--version"])
         except Exception:
-            raise VMProviderError("limactl not found. Please install Lima (brew install lima) to use this provider.")
+            raise VMProviderError(
+                "limactl not found. Please install Lima (brew install lima) to use this provider."
+            )
 
-    def start(self, name: Optional[str] = None, flavor: Optional[str] = None, image: Optional[str] = None, **kwargs) -> str:
+    def start(
+        self,
+        name: str | None = None,
+        flavor: str | None = None,
+        image: str | None = None,
+        **kwargs,
+    ) -> str:
         """
         Starts (launches) a Lima VM. Supports built-in templates or custom YAML paths.
         """
@@ -50,7 +65,14 @@ class Provider(LocalBaseManager):
         else:
             # VM doesn't exist, create and start it
             # Use --tty=false to avoid interactive prompts
-            command = ["limactl", "start", "--name", vm_name, "--tty=false", template_arg]
+            command = [
+                "limactl",
+                "start",
+                "--name",
+                vm_name,
+                "--tty=false",
+                template_arg,
+            ]
 
         try:
             self._run_command(command, stream=True)
@@ -58,7 +80,7 @@ class Provider(LocalBaseManager):
             raise VMProviderError(f"Failed to start Lima VM {vm_name}: {e}")
         return vm_name
 
-    def stop(self, name: Optional[str] = None) -> bool:
+    def stop(self, name: str | None = None) -> bool:
         """Stops a Lima VM."""
         if not name or not self.exists(name):
             raise VMResourceError(f"VM {name} not found.")
@@ -69,7 +91,7 @@ class Provider(LocalBaseManager):
         except Exception as e:
             raise VMProviderError(f"Failed to stop Lima VM {name}: {e}")
 
-    def delete(self, name: Optional[str] = None) -> bool:
+    def delete(self, name: str | None = None) -> bool:
         """Deletes a Lima VM."""
         if not name or not self.exists(name):
             raise VMResourceError(f"VM {name} not found.")
@@ -81,7 +103,7 @@ class Provider(LocalBaseManager):
         except Exception as e:
             raise VMProviderError(f"Failed to delete Lima VM {name}: {e}")
 
-    def list(self) -> List[Dict[str, Any]]:
+    def list(self) -> list[dict[str, Any]]:
         """Lists Lima VMs."""
         try:
             result = self._run_command(["limactl", "list"], stream=False)
@@ -97,7 +119,10 @@ class Provider(LocalBaseManager):
                 parts = line.split()
                 if len(parts) >= 2:
                     # Use lowercase keys for consistency across providers
-                    vm_info = {headers[i].lower(): parts[i] for i in range(min(len(headers), len(parts)))}
+                    vm_info = {
+                        headers[i].lower(): parts[i]
+                        for i in range(min(len(headers), len(parts)))
+                    }
 
                     # Normalize keys for ssh_config and other tools
                     name = vm_info.get("name")
@@ -112,7 +137,7 @@ class Provider(LocalBaseManager):
         except Exception:
             return []
 
-    def info(self, name: str, kind: str = "vm") -> Dict[str, Any]:
+    def info(self, name: str, kind: str = "vm") -> dict[str, Any]:
         """
         Gets detailed information about a Lima VM.
         """
@@ -133,12 +158,14 @@ class Provider(LocalBaseManager):
             raise VMProviderError(f"VM {name} not found.")
         try:
             # limactl shell <name> <cmd>
-            result = self._run_command(["limactl", "shell", name, "sh", "-c", cmd], stream=False)
+            result = self._run_command(
+                ["limactl", "shell", name, "sh", "-c", cmd], stream=False
+            )
             return result.stdout.strip()
         except Exception as e:
             return f"Error executing command: {e}"
 
-    def login(self, name: Optional[str] = None) -> bool:
+    def login(self, name: str | None = None) -> bool:
         """Logs into a Lima VM using 'limactl shell'."""
         if not name:
             self.print("Error: VM name is required to login.")
@@ -150,11 +177,11 @@ class Provider(LocalBaseManager):
         except Exception:
             return False
 
-    def suspend(self, name: Optional[str] = None) -> bool:
+    def suspend(self, name: str | None = None) -> bool:
         """Lima doesn't have a native 'suspend' in the same way; using 'stop'."""
         return self.stop(name)
 
-    def restart(self, name: Optional[str] = None) -> bool:
+    def restart(self, name: str | None = None) -> bool:
         """Restarts a Lima VM."""
         if not name or not self.exists(name):
             return False
@@ -165,12 +192,14 @@ class Provider(LocalBaseManager):
         except Exception:
             return False
 
-    def get_images(self, **kwargs) -> List[Dict[str, Any]]:
+    def get_images(self, **kwargs) -> builtins.list[dict[str, Any]]:
         """
         Lists available images in Lima using 'limactl start --list-templates'.
         """
         try:
-            result = self._run_command(["limactl", "start", "--list-templates"], stream=False)
+            result = self._run_command(
+                ["limactl", "start", "--list-templates"], stream=False
+            )
             lines = result.stdout.strip().split("\n")
             if not lines:
                 return []
@@ -189,7 +218,7 @@ class Provider(LocalBaseManager):
             self.print(f"Error listing Lima images: {e}")
             return []
 
-    def get_flavors(self, **kwargs) -> List[Dict[str, Any]]:
+    def get_flavors(self, **kwargs) -> builtins.list[dict[str, Any]]:
         """
         Lima uses templates rather than fixed flavors, but provides common resource profiles.
         """
@@ -199,7 +228,7 @@ class Provider(LocalBaseManager):
             {"name": "large", "cpu": 4, "ram": "4GiB", "disk": "20GiB"},
         ]
 
-    def get_flavor(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_flavor(self, name: str) -> dict[str, Any] | None:
         """
         Gets details for a specific flavor by name.
         """
@@ -210,7 +239,7 @@ class Provider(LocalBaseManager):
         return None
 
     @property
-    def version(self) -> List[str]:
+    def version(self) -> builtins.list[str]:
         """
         Returns a list of version strings for the limactl tool.
         """
@@ -221,7 +250,9 @@ class Provider(LocalBaseManager):
             pass
         return ["Unknown"]
 
-    def upload_key(self, key_path: str, key_name: str, vm_name: Optional[str] = None) -> bool:
+    def upload_key(
+        self, key_path: str, key_name: str, vm_name: str | None = None
+    ) -> bool:
         """
         Uploads a public SSH key to a Lima VM.
         Appends the key to ~/.ssh/authorized_keys.
@@ -243,11 +274,14 @@ class Provider(LocalBaseManager):
             escaped_name = key_name.replace("'", "'\\''")
 
             command = [
-                "limactl", "shell", vm_name,
-                "sh", "-c",
+                "limactl",
+                "shell",
+                vm_name,
+                "sh",
+                "-c",
                 f"mkdir -p ~/.ssh && chmod 700 ~/.ssh && "
                 f"printf '%s\\n' '{escaped_key} # {escaped_name}' >> ~/.ssh/authorized_keys && "
-                f"chmod 600 ~/.ssh/authorized_keys"
+                f"chmod 600 ~/.ssh/authorized_keys",
             ]
 
             self._run_command(command)
@@ -257,7 +291,7 @@ class Provider(LocalBaseManager):
             self.print(f"Error uploading key to {vm_name}: {e}")
             return False
 
-    def delete_key(self, key_name: str, vm_name: Optional[str] = None) -> bool:
+    def delete_key(self, key_name: str, vm_name: str | None = None) -> bool:
         """
         Deletes a named public SSH key from a Lima VM.
         """
@@ -268,10 +302,13 @@ class Provider(LocalBaseManager):
         try:
             escaped_name = re.escape(key_name).replace("/", r"\/").replace("'", "'\\''")
             command = [
-                "limactl", "shell", vm_name,
-                "sh", "-c",
+                "limactl",
+                "shell",
+                vm_name,
+                "sh",
+                "-c",
                 f"sed -i.bak '/# {escaped_name}$/d' ~/.ssh/authorized_keys && "
-                f"rm -f ~/.ssh/authorized_keys.bak"
+                f"rm -f ~/.ssh/authorized_keys.bak",
             ]
 
             self._run_command(command)
@@ -281,21 +318,22 @@ class Provider(LocalBaseManager):
             self.print(f"Error deleting key from {vm_name}: {e}")
             return False
 
-    def get_keys(self) -> List[Dict[str, Any]]:
+    def get_keys(self) -> builtins.list[dict[str, Any]]:
         """Lima manages SSH keys automatically."""
         return [{"name": "lima-ssh-key", "path": "~/.ssh/id_rsa"}]
 
-    def get_security_groups(self) -> List[Dict[str, Any]]:
+    def get_security_groups(self) -> builtins.list[dict[str, Any]]:
         """Lima uses port forwarding instead of security groups."""
         return [{"name": "default", "description": "Local port forwarding"}]
 
-    def get_ssh_config(self, name: Optional[str] = None) -> Optional[str]:
+    def get_ssh_config(self, name: str | None = None) -> str | None:
         """
         Generates an SSH configuration entry for a Lima VM.
         """
         if not name:
             # Try to get the last used VM if no name provided
             from cloudmesh.ai.command.vm._shared.context import state
+
             name = state.get_last_vm(self.cloud_name)
             if not name:
                 return None
@@ -308,6 +346,7 @@ class Provider(LocalBaseManager):
             # Lima 2.x does not support the old show-ssh-config command.
             # Use a small retry loop to handle cases where the VM is still initializing
             import time
+
             for attempt in range(3):
                 result = self._run_command(
                     ["limactl", "show-ssh", "--format=config", name],
@@ -324,13 +363,14 @@ class Provider(LocalBaseManager):
         """
         Checks if the requirements for this provider are met on the current system.
         """
-        import shutil
         import platform
+        import shutil
+
         if platform.system() not in ["Darwin", "Linux"]:
             return False
         return shutil.which("limactl") is not None
 
-    def validate_config(self) -> Dict[str, List[str]]:
+    def validate_config(self) -> dict[str, builtins.list[str]]:
         """
         Validates Lima configuration.
         """
@@ -347,27 +387,27 @@ class Provider(LocalBaseManager):
 
         return errors_map
 
-    def shelve(self, name: Optional[str] = None) -> bool:
+    def shelve(self, name: str | None = None) -> bool:
         """
         Shelves a VM. Not supported for Lima.
         """
-        self.print(f"Shelve is not supported for the provider Lima")
+        self.print("Shelve is not supported for the provider Lima")
         return False
 
-    def unshelve(self, name: Optional[str] = None) -> bool:
+    def unshelve(self, name: str | None = None) -> bool:
         """
         Unshelves a VM. Not supported for Lima.
         """
-        self.print(f"Unshelve is not supported for the provider Lima")
+        self.print("Unshelve is not supported for the provider Lima")
         return False
 
-    def get_cost(self, **kwargs) -> Optional[Any]:
+    def get_cost(self, **kwargs) -> Any | None:
         """
         Returns the cost information for Lima.
         """
         return {"value": 0, "unit": None}
 
-    def get_provider_info(self) -> Dict[str, Any]:
+    def get_provider_info(self) -> dict[str, Any]:
         """Gets detailed information about the Lima provider."""
         return {
             "provider": "Lima",
@@ -378,11 +418,14 @@ class Provider(LocalBaseManager):
             },
         }
 
-    def wait_for_status(self, name: str, target_status: str, timeout: int = 300) -> bool:
+    def wait_for_status(
+        self, name: str, target_status: str, timeout: int = 300
+    ) -> bool:
         """
         Polls the Lima VM status until it matches target_status.
         """
         import time
+
         from cloudmesh.ai.vm.logger import logger
 
         logger.info(f"Waiting for Lima VM {name} to reach status {target_status}...")
@@ -393,14 +436,14 @@ class Provider(LocalBaseManager):
             vm = next((v for v in vms if v.get("name") == name), None)
             if vm:
                 # Lima's list() returns lower-case keys. We normalize status.
-                current_status = vm.get("status", '').lower()
+                current_status = vm.get("status", "").lower()
                 if current_status == target_status.lower():
                     logger.info(f"VM {name} reached status {target_status}.")
                     return True
 
             time.sleep(5)
 
-        logger.error(f"Timeout reached waiting for Lima VM {name} to reach status {target_status}.")
+        logger.error(
+            f"Timeout reached waiting for Lima VM {name} to reach status {target_status}."
+        )
         return False
-
-
