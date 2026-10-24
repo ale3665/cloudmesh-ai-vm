@@ -24,6 +24,10 @@ def handle_errors(f):
         except VMCommandError as e:
             console.print(f"[bold red]Error:[/bold red] {e.message}")
             raise click.Abort()
+        except (click.exceptions.Exit, click.Abort):
+            # Preserve Click's intentional control flow, including
+            # ctx.exit() used by commands such as `cmx vm doctor --strict`.
+            raise
         except Exception as e:
             # Check if it's a configuration or provider error
             e_type = type(e).__name__
