@@ -106,7 +106,7 @@ def verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, strategy
     elif strategy == "multipass_exec":
         result = subprocess.run(
             ["multipass", "exec", vm_name, "--", "bash", "-c", verify_cmd],
-            capture_output=True,
+            check=False, capture_output=True,
         )
         return result.returncode == 0
 

@@ -67,6 +67,6 @@ markers = [
 [tool.ruff]
 # Use the lint section to avoid deprecation warnings
 [tool.ruff.lint]
-# Ignore N999 (Invalid module name) and BLE001 (blind exception) specifically for tests
-per-file-ignores = { "tests/**/*" = ["N999", "BLE001"] }
+# Ignore N999 (Invalid module name), BLE001 (blind exception) and S110 (try-except-pass) specifically for tests
+per-file-ignores = { "tests/**/*" = ["N999", "BLE001", "S110"] }
 
