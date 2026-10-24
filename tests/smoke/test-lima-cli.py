@@ -11,7 +11,7 @@ from tests.smoke.cli_helper import setup_cli_config
 from tests.smoke.benchmark_helper import (
     save_benchmark,
     create_benchmark_payload,
-    get_results_username,  
+    get_results_username,
 )
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def test_lima_cli_lifecycle(runner, config):
     Smoke test for Lima CLI lifecycle.
     """
     env = {"OS_CLOUD": "lima"}
-    
+
     # 1. providers
     with StopWatch.timer("lima_provider_list"):
         result = runner.invoke(vm.vm_group, ["provider", "list"], env=env)
@@ -48,22 +48,17 @@ def test_lima_cli_lifecycle(runner, config):
     with StopWatch.timer("lima_start"):
         result = runner.invoke(vm.vm_group, ["start"], env=env)
     StopWatch.status("lima_start", result.exit_code == 0)
-    if result.exit_code != 0:
-        pytest.skip(f"Lima start failed: {result.output}")
-
     output = Text.from_ansi(result.output).plain
-    assert "Generating VM name" in output
 
-    # Extract the generated VM name
-    import re
-    match = re.search(r"Successfully started VM ([\w-]+)", output)
-    if match:
-        vm_name = match.group(1)
-    else:
-        # Fallback for different output formats
-        vm_name = "smoke-lima-vm"
+    # Identify the generated VM without guessing a fallback name.
+    match = re.search(r"Generating VM name:\s*([\w-]+)", output)
+    assert match, f"Could not determine generated VM name: {output}"
+    vm_name = match.group(1)
 
     try:
+        assert result.exit_code == 0, f"Lima start failed: {output}"
+        assert f"Successfully started VM {vm_name}" in output
+
         # 4. list
         with StopWatch.timer("lima_list"):
             result = runner.invoke(vm.vm_group, ["list"], env=env)
@@ -74,7 +69,7 @@ def test_lima_cli_lifecycle(runner, config):
 
         # 5. run
         with StopWatch.timer("lima_run"):
-            result = runner.invoke(vm.vm_group, ["run", vm_name, "hostname"])
+            result = runner.invoke(vm.vm_group, ["run", vm_name, "hostname"], env=env)
         StopWatch.status("lima_run", result.exit_code == 0)
         if result.exit_code != 0:
             pytest.skip(f"Lima run failed: {result.output}")
@@ -128,9 +123,9 @@ def test_lima_cli_lifecycle(runner, config):
         assert "Host" in result.output
 
     finally:
-        # Cleanup VMs
-        runner.invoke(vm.vm_group, ["delete", vm_name])
-        
+        # Always attempt to remove the test VM using the Lima provider.
+        runner.invoke(vm.vm_group, ["delete", vm_name], env=env)
+
         # Save standard benchmark text/json files
         save_benchmark(tag="Lima CLI", config_path=config)
 
@@ -142,10 +137,10 @@ def test_lima_cli_lifecycle(runner, config):
 
         # Create and print/save the structured JSON payload
         payload = create_benchmark_payload(
-            benchmark_name="Lima CLI", 
+            benchmark_name="Lima CLI",
             user=username
         )
-        
+
         print(json.dumps(payload, indent=2))
 
 def test_lima_cli_start_with_name(runner, config):
@@ -153,11 +148,17 @@ def test_lima_cli_start_with_name(runner, config):
     Test starting a Lima VM with a specific name.
     """
     vm_name = "test-named-lima-vm"
-    runner.invoke(vm.vm_group, ["delete", vm_name])
+    env = {"OS_CLOUD": "lima"}
+    runner.invoke(vm.vm_group, ["delete", vm_name], env=env)
 
-    result = runner.invoke(vm.vm_group, ["start", vm_name])
-    if result.exit_code != 0:
-        pytest.skip("Lima start failed")
-
-    assert f"Successfully started VM {vm_name}" in Text.from_ansi(result.output).plain
-    runner.invoke(vm.vm_group, ["delete", vm_name])
+    try:
+        result = runner.invoke(vm.vm_group, ["start", vm_name], env=env)
+        assert result.exit_code == 0, (
+            f"Lima named VM start failed: {result.output}"
+        )
+        assert (
+            f"Successfully started VM {vm_name}"
+            in Text.from_ansi(result.output).plain
+        )
+    finally:
+        runner.invoke(vm.vm_group, ["delete", vm_name], env=env)
