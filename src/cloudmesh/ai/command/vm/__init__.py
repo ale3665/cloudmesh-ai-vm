@@ -20,7 +20,7 @@ from cloudmesh.ai.command._shared.utils import load_commands_recursively
 @click.pass_context
 def vm_group(ctx: click.Context, interactive: bool = False) -> None:
     """VM management commands"""
-    ctx.obj = VMContext()
+    ctx.ensure_object(VMContext)
 
     os_cloud = os.environ.get("OS_CLOUD")
     active_cloud = ctx.obj.cloud_override or os_cloud

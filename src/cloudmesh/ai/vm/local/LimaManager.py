@@ -49,6 +49,7 @@ class Provider(LocalBaseManager):
             command = ["limactl", "start", vm_name, "--tty=false"]
         else:
             # VM doesn't exist, create and start it
+            # Use --tty=false to avoid interactive prompts
             command = ["limactl", "start", "--name", vm_name, "--tty=false", template_arg]
 
         try:
@@ -303,11 +304,18 @@ class Provider(LocalBaseManager):
             return None
 
         try:
-            # Use limactl to get the SSH config
-            # limactl show-ssh-config <name>
-            result = self._run_command(["limactl", "show-ssh", name], stream=False)
-            if result.stdout:
-                return result.stdout.strip()
+            # Request an OpenSSH configuration entry from Lima.
+            # Lima 2.x does not support the old show-ssh-config command.
+            # Use a small retry loop to handle cases where the VM is still initializing
+            import time
+            for attempt in range(3):
+                result = self._run_command(
+                    ["limactl", "show-ssh", "--format=config", name],
+                    stream=False,
+                )
+                if result.stdout:
+                    return result.stdout.strip()
+                time.sleep(2)
             return None
         except Exception:
             return None

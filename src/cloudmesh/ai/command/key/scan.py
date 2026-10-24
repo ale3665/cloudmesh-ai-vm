@@ -29,13 +29,21 @@ def scan(as_json: bool):
         path = k["path"]
         if path.startswith(home):
             path = path.replace(home, "~", 1)
-        rows.append([path, k["type"], k["sha256"], k["md5"], k["comment"], "Yes" if k["has_passphrase"] else "No"])
+        passphrase_status = (
+            "Yes" if k["has_passphrase"] is True
+            else "No" if k["has_passphrase"] is False
+            else "Unknown"
+        )
+        rows.append([
+            path, k["type"], k["sha256"], k["md5"],
+            k["comment"], passphrase_status,
+        ])
 
     render_table("Local SSH Keys", ["Path", "Type", "Fingerprint (SHA256)", "Fingerprint (MD5)", "Comment", "Passphrase"], rows)
 
     # Identify keys without passphrases
     unprotected_keys = [k["path"].replace(home, "~", 1) if k["path"].startswith(home) else k["path"]
-                        for k in keys if not k["has_passphrase"]]
+                        for k in keys if k["has_passphrase"] is False]
 
     if unprotected_keys:
         console.print("\n[bold red]The following keys are unprotected (no passphrase):[/bold red]")
