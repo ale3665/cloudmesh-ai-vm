@@ -1,22 +1,24 @@
-import pytest
-import re
 import json
-from rich.text import Text
+import re
+
+import pytest
 from click.testing import CliRunner
-from cloudmesh.ai.command import vm
 from cloudmesh.ai.common.stopwatch import StopWatch
+from rich.text import Text
 
-from tests.smoke.cli_helper import setup_cli_config
-
+from cloudmesh.ai.command import vm
 from tests.smoke.benchmark_helper import (
-    save_benchmark,
     create_benchmark_payload,
     get_results_username,
+    save_benchmark,
 )
+from tests.smoke.cli_helper import setup_cli_config
+
 
 @pytest.fixture
 def runner():
     return CliRunner()
+
 
 @pytest.fixture
 def config(tmp_path, runner):
@@ -24,6 +26,7 @@ def config(tmp_path, runner):
         "template": "ubuntu",
     }
     setup_cli_config(tmp_path, "lima", provider_config)
+
 
 def test_lima_cli_lifecycle(runner, config):
     """
@@ -111,9 +114,7 @@ def test_lima_cli_lifecycle(runner, config):
         assert result.exit_code == 0
 
         # 12. ssh_config
-        restart_result = runner.invoke(
-            vm.vm_group, ["start", vm_name], env=env
-        )
+        restart_result = runner.invoke(vm.vm_group, ["start", vm_name], env=env)
         assert restart_result.exit_code == 0
 
         with StopWatch.timer("lima_ssh_config"):
@@ -136,12 +137,10 @@ def test_lima_cli_lifecycle(runner, config):
             username = "smoke_test_user"
 
         # Create and print/save the structured JSON payload
-        payload = create_benchmark_payload(
-            benchmark_name="Lima CLI",
-            user=username
-        )
+        payload = create_benchmark_payload(benchmark_name="Lima CLI", user=username)
 
         print(json.dumps(payload, indent=2))
+
 
 def test_lima_cli_start_with_name(runner, config):
     """
@@ -153,12 +152,9 @@ def test_lima_cli_start_with_name(runner, config):
 
     try:
         result = runner.invoke(vm.vm_group, ["start", vm_name], env=env)
-        assert result.exit_code == 0, (
-            f"Lima named VM start failed: {result.output}"
-        )
+        assert result.exit_code == 0, f"Lima named VM start failed: {result.output}"
         assert (
-            f"Successfully started VM {vm_name}"
-            in Text.from_ansi(result.output).plain
+            f"Successfully started VM {vm_name}" in Text.from_ansi(result.output).plain
         )
     finally:
         runner.invoke(vm.vm_group, ["delete", vm_name], env=env)

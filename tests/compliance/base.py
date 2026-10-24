@@ -1,6 +1,10 @@
+from collections.abc import Callable
+from typing import Any
+
 import pytest
-from typing import Any, Callable
+
 from cloudmesh.ai.vm.exceptions import ProviderFeatureNotSupported
+
 
 class ComplianceHelper:
     """
@@ -26,5 +30,7 @@ class ComplianceHelper:
         """
         assert isinstance(result, list), f"Expected list, got {type(result)}"
         for item in result:
-            assert isinstance(item, dict), f"Expected list item to be dict, got {type(item)}"
+            assert isinstance(item, dict), (
+                f"Expected list item to be dict, got {type(item)}"
+            )
             assert item_key in item, f"Expected dict item to contain key '{item_key}'"

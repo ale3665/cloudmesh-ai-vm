@@ -1,6 +1,7 @@
 import logging
 import sys
 
+
 def setup_logger(name: str, level=logging.INFO):
     """
     Configures and returns a logger instance.
@@ -11,13 +12,14 @@ def setup_logger(name: str, level=logging.INFO):
     if not logger.handlers:
         handler = logging.StreamHandler(sys.stdout)
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-    
+
     return logger
+
 
 # Default logger for the application
 logger = setup_logger("cloudmesh")

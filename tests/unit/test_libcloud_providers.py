@@ -1,10 +1,11 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from cloudmesh.ai.vm.aws.AwsManager import Provider as AwsProvider
 from cloudmesh.ai.vm.azure.AzureManager import Provider as AzureProvider
+from cloudmesh.ai.vm.exceptions import ProviderFeatureNotSupported
 from cloudmesh.ai.vm.google.GoogleManager import Provider as GoogleProvider
-
-from cloudmesh.ai.vm.exceptions import VMProviderError, ProviderFeatureNotSupported
 
 # Mock configuration
 MOCK_CONFIG = {
@@ -14,7 +15,7 @@ MOCK_CONFIG = {
             "secret_key": "test-secret",
             "region": "us-east-1",
             "image": "ami-123",
-            "size": "t2.micro"
+            "size": "t2.micro",
         },
         "azure": {
             "tenant_id": "test-tenant",
@@ -22,16 +23,17 @@ MOCK_CONFIG = {
             "client_id": "test-client",
             "client_secret": "test-secret",
             "image": "ubuntu-22.04",
-            "size": "Standard_DS1_v2"
+            "size": "Standard_DS1_v2",
         },
         "google": {
             "project_id": "test-project",
             "private_key": "/path/to/key.json",
             "image": "ubuntu-2204-lts",
-            "size": "n1-standard-1"
-        }
+            "size": "n1-standard-1",
+        },
     }
 }
+
 
 class TestLibcloudProviders:
     """
@@ -45,12 +47,12 @@ class TestLibcloudProviders:
         mock_image = MagicMock()
         mock_image.name = "test-image"
         driver.list_images.return_value = [mock_image]
-        
+
         mock_size = MagicMock()
         mock_size.name = "test-size"
         mock_size.id = "test-size-id"
         driver.list_sizes.return_value = [mock_size]
-        
+
         # Mock node
         mock_node = MagicMock()
         mock_node.name = "test-vm"
@@ -60,18 +62,16 @@ class TestLibcloudProviders:
         driver.create_node.return_value = mock_node
         driver.get_node.return_value = mock_node
         driver.list_nodes.return_value = [mock_node]
-        
+
         return driver
 
     @patch("cloudmesh.ai.vm.aws.AwsManager.AmazonEC2Driver")
     def test_aws_init(self, mock_driver_class):
         mock_driver_class.return_value = MagicMock()
         provider = AwsProvider(MOCK_CONFIG)
-        
+
         mock_driver_class.assert_called_once_with(
-            access_key="test-access",
-            secret_key="test-secret",
-            region="us-east-1"
+            access_key="test-access", secret_key="test-secret", region="us-east-1"
         )
         assert provider.cloud_name == "aws"
 
@@ -79,12 +79,12 @@ class TestLibcloudProviders:
     def test_azure_init(self, mock_driver_class):
         mock_driver_class.return_value = MagicMock()
         provider = AzureProvider(MOCK_CONFIG)
-        
+
         mock_driver_class.assert_called_once_with(
             tenant_id="test-tenant",
             subscription_id="test-sub",
             client_id="test-client",
-            client_secret="test-secret"
+            client_secret="test-secret",
         )
         assert provider.cloud_name == "azure"
 
@@ -92,18 +92,19 @@ class TestLibcloudProviders:
     def test_google_init(self, mock_driver_class):
         mock_driver_class.return_value = MagicMock()
         provider = GoogleProvider(MOCK_CONFIG)
-        
+
         mock_driver_class.assert_called_once_with(
-            project_id="test-project",
-            private_key="/path/to/key.json"
+            project_id="test-project", private_key="/path/to/key.json"
         )
         assert provider.cloud_name == "google"
 
     def test_lifecycle_methods(self, mock_driver):
         # Test using AWS Provider as the representative for LibcloudManager logic
-        with patch("cloudmesh.ai.vm.aws.AwsManager.AmazonEC2Driver", return_value=mock_driver):
+        with patch(
+            "cloudmesh.ai.vm.aws.AwsManager.AmazonEC2Driver", return_value=mock_driver
+        ):
             provider = AwsProvider(MOCK_CONFIG)
-            
+
             # Update config to match the mock images/sizes
             provider.config["clouds"]["aws"]["image"] = "test-image"
             provider.config["clouds"]["aws"]["size"] = "test-size"
@@ -132,7 +133,9 @@ class TestLibcloudProviders:
         mock_node = MagicMock(spec=[])
         mock_driver.get_node.return_value = mock_node
 
-        with patch("cloudmesh.ai.vm.aws.AwsManager.AmazonEC2Driver", return_value=mock_driver):
+        with patch(
+            "cloudmesh.ai.vm.aws.AwsManager.AmazonEC2Driver", return_value=mock_driver
+        ):
             provider = AwsProvider(MOCK_CONFIG)
             with pytest.raises(ProviderFeatureNotSupported):
                 provider.suspend(name="test-vm")
@@ -141,7 +144,9 @@ class TestLibcloudProviders:
 
     def test_missing_config(self):
         incomplete_config = {"clouds": {"aws": {}}}
-        with patch("cloudmesh.ai.vm.aws.AwsManager.AmazonEC2Driver", return_value=MagicMock()):
+        with patch(
+            "cloudmesh.ai.vm.aws.AwsManager.AmazonEC2Driver", return_value=MagicMock()
+        ):
             provider = AwsProvider(incomplete_config)
             # start() should raise ConfigError if image is missing
             with pytest.raises(Exception) as excinfo:

@@ -1,11 +1,12 @@
-import subprocess
 import logging
+import subprocess
 from abc import ABC
-from typing import List, Dict, Any, Optional
+
 from .CloudBaseManager import CloudBaseManager
-from .exceptions import VMProviderError, ProviderFeatureNotSupported
+from .exceptions import ProviderFeatureNotSupported
 
 logger = logging.getLogger("cloudmesh.ai.vm")
+
 
 class LocalBaseManager(CloudBaseManager, ABC):
     """
@@ -13,10 +14,12 @@ class LocalBaseManager(CloudBaseManager, ABC):
     Standardizes CLI execution and common local VM operations.
     """
 
-    def _run_command(self, command: List[str], stream: bool = False) -> subprocess.CompletedProcess:
+    def _run_command(
+        self, command: list[str], stream: bool = False
+    ) -> subprocess.CompletedProcess:
         """
         Unified helper to run shell commands.
-        
+
         Args:
             command: The command to execute as a list.
             stream: If True, prints output to the console in real-time.
@@ -28,29 +31,31 @@ class LocalBaseManager(CloudBaseManager, ABC):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
-                    bufsize=1
+                    bufsize=1,
                 )
                 full_output = []
                 for line in process.stdout:
                     self.print_ansi(line, end="")
                     full_output.append(line)
                 process.wait()
-                
+
                 if process.returncode != 0:
                     raise subprocess.CalledProcessError(
-                        process.returncode, 
-                        command, 
+                        process.returncode,
+                        command,
                         output="".join(full_output),
-                        stderr="".join(full_output)
+                        stderr="".join(full_output),
                     )
                 return subprocess.CompletedProcess(
-                    args=command, 
-                    returncode=process.returncode, 
-                    stdout="".join(full_output), 
-                    stderr=None
+                    args=command,
+                    returncode=process.returncode,
+                    stdout="".join(full_output),
+                    stderr=None,
                 )
             else:
-                return subprocess.run(command, capture_output=True, text=True, check=True)
+                return subprocess.run(
+                    command, capture_output=True, text=True, check=True
+                )
         except subprocess.CalledProcessError as e:
             logger.error(f"CLI command failed: {' '.join(command)} - {e.stderr}")
             raise e
@@ -72,7 +77,9 @@ class LocalBaseManager(CloudBaseManager, ABC):
                 return True
         return False
 
-    def upload_key(self, key_path: str, key_name: str, vm_name: Optional[str] = None) -> bool:
+    def upload_key(
+        self, key_path: str, key_name: str, vm_name: str | None = None
+    ) -> bool:
         """
         Uploads a public key to the local VM.
         Implementation: Appends the key to ~/.ssh/authorized_keys via run_command.
@@ -83,7 +90,7 @@ class LocalBaseManager(CloudBaseManager, ABC):
         # For the base class, we raise NotSupported as it needs a VM target.
         raise ProviderFeatureNotSupported(self.cloud_name, "upload_key")
 
-    def delete_key(self, key_name: str, vm_name: Optional[str] = None) -> bool:
+    def delete_key(self, key_name: str, vm_name: str | None = None) -> bool:
         """
         Deletes a public key from the local VM.
         """

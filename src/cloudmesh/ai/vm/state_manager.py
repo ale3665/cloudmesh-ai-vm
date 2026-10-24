@@ -1,18 +1,19 @@
-import os
-from typing import Optional, Dict, Any
+from typing import Any
+
 from yamldb import YamlDB
-from cloudmesh.ai.vm.logger import logger
+
 
 class StateManager:
     """
     Handles persistent state for cloudmesh-ai-vm using yamldb.
     Provides dynamic access to the YAML configuration.
     """
+
     def __init__(self, config_path: str):
         self.config_path = config_path
         self.db = YamlDB(filename=config_path)
 
-    def get_cloud_config(self, cloud_name: str) -> Dict[str, Any]:
+    def get_cloud_config(self, cloud_name: str) -> dict[str, Any]:
         """
         Retrieves configuration for a specific cloud.
         Returns a dictionary to maintain backward compatibility with providers.
@@ -31,7 +32,7 @@ class StateManager:
         """Sets the last used VM for a specific cloud."""
         self.db.set(f"last_vm.{cloud_name}", vm_name)
 
-    def get_last_vm(self, cloud_name: str) -> Optional[str]:
+    def get_last_vm(self, cloud_name: str) -> str | None:
         """Gets the last used VM for a specific cloud."""
         return self.db.get(f"last_vm.{cloud_name}")
 

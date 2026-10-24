@@ -2,7 +2,6 @@ import socket
 import time
 from datetime import datetime
 from operator import attrgetter
-from typing import Dict, List, Optional, Union
 
 from fabric import Connection
 from IPython.display import HTML, display
@@ -41,7 +40,7 @@ def instance_create_args(
     **kwargs,
 ):
     if name is None:
-        name = "instance-{}".format(random_base32(6))
+        name = f"instance-{random_base32(6)}"
 
     server_args = {
         "name": name,
@@ -103,12 +102,12 @@ class Server:
     def __init__(
         self,
         name: str,
-        reservation_id: Optional[str] = None,
-        image_name: Optional[str] = DEFAULT_IMAGE_NAME,
-        image: Optional[Image] = None,
+        reservation_id: str | None = None,
+        image_name: str | None = DEFAULT_IMAGE_NAME,
+        image: Image | None = None,
         flavor_name: str = BAREMETAL_FLAVOR,
         key_name: str = None,
-        keypair: Optional[Keypair] = None,
+        keypair: Keypair | None = None,
         network_name: str = DEFAULT_NETWORK,
     ):
         self.name = name
@@ -134,23 +133,23 @@ class Server:
 
         self.conn = connection(session=session())
 
-        self.id: Optional[str] = None
-        self._addresses: Dict[str, List[str]] = {}
-        self.created_at: Optional[datetime] = None
-        self.host_id: Optional[str] = None
-        self.host_status: Optional[str] = None
-        self.hypervisor_hostname: Optional[str] = None
+        self.id: str | None = None
+        self._addresses: dict[str, list[str]] = {}
+        self.created_at: datetime | None = None
+        self.host_id: str | None = None
+        self.host_status: str | None = None
+        self.hypervisor_hostname: str | None = None
         self.is_locked: bool = False
-        self._status: Optional[str] = None
+        self._status: str | None = None
 
     @property
-    def addresses(self) -> Dict[str, List[str]]:
+    def addresses(self) -> dict[str, list[str]]:
         if self.id:
             self.refresh()
         return self._addresses
 
     @property
-    def status(self) -> Optional[str]:
+    def status(self) -> str | None:
         if self.id:
             self.refresh()
         return self._status
@@ -459,7 +458,7 @@ class Server:
         return formatted
 
     def associate_floating_ip(
-        self, fip: Optional[str] = None, port_id: Optional[str] = None
+        self, fip: str | None = None, port_id: str | None = None
     ) -> None:
         """
         Associates a floating IP with the server.
@@ -476,7 +475,7 @@ class Server:
         self.refresh()
         return fip
 
-    def detach_floating_ip(self, fip: str, delete: Optional[bool] = True) -> None:
+    def detach_floating_ip(self, fip: str, delete: bool | None = True) -> None:
         """
         Detaches a floating IP from the server.
 
@@ -564,10 +563,8 @@ class Server:
             res = pb.wait(_callback, timeout * 0.9, timeout)
             if not res:
                 raise ResourceError(
-                    (
-                        f"Waited too long for the port {port} on host {host} to "
-                        "start accepting connections."
-                    )
+                    f"Waited too long for the port {port} on host {host} to "
+                    "start accepting connections."
                 )
         else:
             res = _callback()
@@ -622,7 +619,7 @@ class Server:
         with self.ssh_connection(**kwargs) as conn:
             return conn.run(command)
 
-    def get_metadata(self) -> Dict[str, str]:
+    def get_metadata(self) -> dict[str, str]:
         """Get the metadata dictionary of this server
 
         Returns:
@@ -707,7 +704,7 @@ class Flavor:
         return f"<{self.__class__.__name__} '{self.name}' {self.description} (disk={self.disk}) (ram={self.ram}) (vcpus={self.vcpus})>"
 
 
-def list_flavors(reservable=None, gpu=None, reservation_id=None) -> List[Flavor]:
+def list_flavors(reservable=None, gpu=None, reservation_id=None) -> list[Flavor]:
     """Get a list of flavors
 
     Args:
@@ -825,7 +822,7 @@ def show_flavor_by_name(name) -> NovaFlavor:
 ##########
 
 
-def list_servers(**kwargs) -> List[Server]:
+def list_servers(**kwargs) -> list[Server]:
     """
     Returns a list of all servers in the current project.
 
@@ -1050,10 +1047,8 @@ def wait_for_tcp(host, port, timeout=(60 * 20), sleep_time=5):
             time.sleep(sleep_time)
             if time.perf_counter() - start_time >= timeout:
                 raise ServiceError(
-                    (
-                        f"Waited too long for the port {port} on host {host} to "
-                        "start accepting connections."
-                    )
+                    f"Waited too long for the port {port} on host {host} to "
+                    "start accepting connections."
                 ) from ex
 
 
@@ -1101,7 +1096,7 @@ def get_keypair(name=None) -> Keypair:
         return Keypair(name=name, public_key=None)
 
 
-def list_keypair() -> List[Keypair]:
+def list_keypair() -> list[Keypair]:
     """
     Retrieve a list of keypairs from the Nova client.
 
@@ -1170,7 +1165,7 @@ def create_server(
     flavor_name=None,
     count=1,
     hypervisor_hostname=None,
-) -> "Union[NovaServer,list[NovaServer]]":
+) -> "NovaServer | list[NovaServer]":
     """
     .. deprecated:: 1.0
 

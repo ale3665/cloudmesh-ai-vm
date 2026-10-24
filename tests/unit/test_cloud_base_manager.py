@@ -26,6 +26,4 @@ def test_delete_key_not_supported(provider):
 
 def test_add_security_group_rule_not_supported(provider):
     with pytest.raises(ProviderFeatureNotSupported):
-        provider.add_security_group_rule(
-            "test-sg", "tcp", "22", "0.0.0.0/0", "ingress"
-        )
+        provider.add_security_group_rule("test-sg", "tcp", "22", "0.0.0.0/0", "ingress")

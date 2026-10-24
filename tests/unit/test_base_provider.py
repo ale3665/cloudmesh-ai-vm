@@ -9,7 +9,6 @@ def test_login_not_supported():
     provider = BaseVMProvider(config={})
 
     with pytest.raises(
-        ProviderFeatureNotSupported,
-        match="does not support the feature: login"
+        ProviderFeatureNotSupported, match="does not support the feature: login"
     ):
         provider.login("test-vm")

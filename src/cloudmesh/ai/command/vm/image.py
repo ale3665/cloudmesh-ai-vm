@@ -1,7 +1,13 @@
 import click
-from cloudmesh.ai.command._shared.context import console, get_active_provider, vm_options
+
+from cloudmesh.ai.command._shared.context import (
+    console,
+    get_active_provider,
+    vm_options,
+)
 from cloudmesh.ai.command._shared.exceptions import handle_errors
 from cloudmesh.ai.command._shared.ui import render_table
+
 
 @click.command()
 @click.pass_context
@@ -10,12 +16,13 @@ from cloudmesh.ai.command._shared.ui import render_table
 def image(ctx: click.Context, **kwargs):
     """List available VM image."""
     provider = get_active_provider(ctx)
-    imgs = provider.get_images() # Adjusted to use get_images() from MultipassManager
+    imgs = provider.get_images()  # Adjusted to use get_images() from MultipassManager
     if imgs:
         columns = ["Name", "ID"]
         rows = [[img.get("name", "Unknown"), img.get("id", "Unknown")] for img in imgs]
         render_table("Available VM Images", columns, rows)
     else:
         console.print("No images found.")
+
 
 cmd = image

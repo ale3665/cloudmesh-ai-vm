@@ -1,9 +1,17 @@
+import builtins
 from pathlib import Path
+from typing import Any
+
 import yaml
-from typing import List, Dict, Any, Optional
-import re
+
 from cloudmesh.ai.vm.CloudBaseManager import CloudBaseManager
-from cloudmesh.ai.vm.exceptions import ConfigError, VMResourceError, VMAuthError, VMNetworkError, VMProviderError
+from cloudmesh.ai.vm.exceptions import (
+    ConfigError,
+    VMAuthError,
+    VMProviderError,
+    VMResourceError,
+)
+
 
 class OpenstackManager(CloudBaseManager):
     """
@@ -11,7 +19,7 @@ class OpenstackManager(CloudBaseManager):
     Implements common OpenStack VM operations using OpenStack SDK.
     """
 
-    def __init__(self, config: Any, cloud_name: Optional[str] = None, **kwargs):
+    def __init__(self, config: Any, cloud_name: str | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         # If cloud_name is not provided, try to infer it from the config
@@ -36,10 +44,11 @@ class OpenstackManager(CloudBaseManager):
         Returns an authenticated OpenStack SDK connection.
         Merges Cloudmesh config with standard clouds.yaml.
         """
-        from cloudmesh.ai.vm.logger import logger
-        import openstack
         import os
-        import yaml
+
+        import openstack
+
+        from cloudmesh.ai.vm.logger import logger
 
         # 1. Get config from Cloudmesh State
         cloud_config = self.get_cloud_config(self.cloud_name) or {}
@@ -60,7 +69,9 @@ class OpenstackManager(CloudBaseManager):
 
                     cloud_config = {**cloud_config, **os_cloud_cfg}
                     cloud_config["auth"] = merged_auth
-                    logger.debug(f"Merged configuration for '{self.cloud_name}' from {os_clouds_path}")
+                    logger.debug(
+                        f"Merged configuration for '{self.cloud_name}' from {os_clouds_path}"
+                    )
             except Exception as e:
                 logger.warning(f"Could not parse {os_clouds_path}: {e}")
 
@@ -79,16 +90,27 @@ class OpenstackManager(CloudBaseManager):
                 auth_url=auth.get("auth_url") or cloud_config.get("auth_url"),
                 username=auth.get("username") or cloud_config.get("username"),
                 password=auth.get("password") or cloud_config.get("password"),
-                project_name=auth.get("project_name") or cloud_config.get("project_name"),
-                user_domain_name=auth.get("user_domain_name") or cloud_config.get("user_domain_name", "Default"),
-                project_domain_name=auth.get("project_domain_name") or cloud_config.get("project_domain_name", "Default"),
-                region_name=cloud_config.get("region_name") or auth.get("region_name")
+                project_name=auth.get("project_name")
+                or cloud_config.get("project_name"),
+                user_domain_name=auth.get("user_domain_name")
+                or cloud_config.get("user_domain_name", "Default"),
+                project_domain_name=auth.get("project_domain_name")
+                or cloud_config.get("project_domain_name", "Default"),
+                region_name=cloud_config.get("region_name") or auth.get("region_name"),
             )
         except Exception as e:
-            logger.error(f"Failed to connect to OpenStack SDK for cloud {self.cloud_name}: {e}")
+            logger.error(
+                f"Failed to connect to OpenStack SDK for cloud {self.cloud_name}: {e}"
+            )
             raise VMAuthError(f"OpenStack SDK connection failed: {e}") from e
 
-    def start(self, name: Optional[str] = None, flavor: Optional[str] = None, image: Optional[str] = None, **kwargs) -> str:
+    def start(
+        self,
+        name: str | None = None,
+        flavor: str | None = None,
+        image: str | None = None,
+        **kwargs,
+    ) -> str:
         """Starts a VM in OpenStack using the SDK."""
         cloud_config = self.get_cloud_config(self.cloud_name)
         image_name = image or cloud_config.get("image")
@@ -99,6 +121,7 @@ class OpenstackManager(CloudBaseManager):
             key_name = Path(cloud_config["key_path"]).name.replace(".pub", "")
 
         from cloudmesh.ai.vm.logger import logger
+
         logger.debug(f"Using key_name: {key_name} (derived from config/clouds.yaml)")
 
         if not image_name:
@@ -111,11 +134,15 @@ class OpenstackManager(CloudBaseManager):
             # Find image and flavor objects
             img = conn.compute.find_image(image_name)
             if not img:
-                raise VMResourceError(f"Could not find image {image_name} in {self.cloud_name}")
+                raise VMResourceError(
+                    f"Could not find image {image_name} in {self.cloud_name}"
+                )
 
             flv = conn.compute.find_flavor(flavor_name)
             if not flv:
-                raise VMResourceError(f"Could not find flavor {flavor_name} in {self.cloud_name}")
+                raise VMResourceError(
+                    f"Could not find flavor {flavor_name} in {self.cloud_name}"
+                )
 
             sg = conn.network.find_security_group(security_group)
             if sg is None:
@@ -129,7 +156,12 @@ class OpenstackManager(CloudBaseManager):
             # ONLY if a name was not explicitly provided by the user.
             if not name and self.cloud_name in ["jetstream", "chameleon"]:
                 username = cloud_config.get("username", "user").replace("_", "-")
-                site = cloud_config.get("site", self.cloud_name).replace("_", "-").replace("@", "").lower()
+                site = (
+                    cloud_config.get("site", self.cloud_name)
+                    .replace("_", "-")
+                    .replace("@", "")
+                    .lower()
+                )
 
                 if site == self.cloud_name:
                     vm_name = f"{vm_name}-{username}"
@@ -149,35 +181,47 @@ class OpenstackManager(CloudBaseManager):
 
             # Wait for the VM to actually be ACTIVE before proceeding to IP assignment
             if not self.wait_for_active(vm_name):
-                raise VMProviderError(f"VM {vm_name} failed to become ACTIVE. Aborting start.")
+                raise VMProviderError(
+                    f"VM {vm_name} failed to become ACTIVE. Aborting start."
+                )
 
             # Automatically assign a floating IP to make the VM reachable if requested
-            if kwargs.get('assign_ip', True):
+            if kwargs.get("assign_ip", True):
                 fip = self.assign_floating_ip(vm_name)
                 if fip:
                     from cloudmesh.ai.vm.logger import logger
-                    logger.info(f"Floating IP {fip} assigned. Verifying SSH connectivity...")
+
+                    logger.info(
+                        f"Floating IP {fip} assigned. Verifying SSH connectivity..."
+                    )
                     if self.wait_for_login(vm_name):
                         logger.info(f"VM {vm_name} is reachable via SSH.")
                     else:
                         logger.warning(f"VM {vm_name} started but SSH login timed out.")
                 else:
                     from cloudmesh.ai.vm.logger import logger
-                    logger.warning(f"Requested floating IP for {vm_name} but none could be assigned.")
 
-
+                    logger.warning(
+                        f"Requested floating IP for {vm_name} but none could be assigned."
+                    )
 
             return server.id
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
-            logger.error(f"SDK start failed for {self.cloud_name} with key_name '{key_name}': {e}")
-            raise VMProviderError(f"SDK start failed for {self.cloud_name} (key_name: {key_name}): {e}") from e
+
+            logger.error(
+                f"SDK start failed for {self.cloud_name} with key_name '{key_name}': {e}"
+            )
+            raise VMProviderError(
+                f"SDK start failed for {self.cloud_name} (key_name: {key_name}): {e}"
+            ) from e
 
     def wait_for_active(self, name: str, timeout: int = 300) -> bool:
         """
         Waits for the VM to reach the 'active' or 'running' state.
         """
         import time
+
         from cloudmesh.ai.vm.logger import logger
 
         logger.info(f"Waiting for VM {name} to become active/running...")
@@ -186,9 +230,9 @@ class OpenstackManager(CloudBaseManager):
             node = self._find_node(name)
             if node:
                 # Use OpenStack SDK server status
-                status = getattr(node, 'status', '').lower()
+                status = getattr(node, "status", "").lower()
 
-                if status == 'active':
+                if status == "active":
                     logger.info(f"VM {name} is now active (status: {status}).")
                     return True
                 logger.debug(f"VM {name} is currently in state: {status}. Waiting...")
@@ -200,26 +244,41 @@ class OpenstackManager(CloudBaseManager):
         logger.error(f"Timeout reached waiting for VM {name} to become active.")
         return False
 
-    def wait_for_login(self, name: str, timeout: int = 300, check_command: str = "uptime") -> bool:
+    def wait_for_login(
+        self, name: str, timeout: int = 300, check_command: str = "uptime"
+    ) -> bool:
         """
         Waits until the VM is reachable via SSH.
         """
         import time
+
         from cloudmesh.ai.vm.logger import logger
 
-        logger.info(f"Waiting for SSH login to be available on VM {name} using command '{check_command}'...")
+        logger.info(
+            f"Waiting for SSH login to be available on VM {name} using command '{check_command}'..."
+        )
         start_time = time.time()
         while time.time() - start_time < timeout:
             # Try the check command to verify connectivity
             result = self.run_command(name, check_command)
-            if result and not result.startswith("Error:") and not result.startswith("SSH Error"):
-                logger.info(f"SSH login successful for VM {name} (verified with '{check_command}').")
+            if (
+                result
+                and not result.startswith("Error:")
+                and not result.startswith("SSH Error")
+            ):
+                logger.info(
+                    f"SSH login successful for VM {name} (verified with '{check_command}')."
+                )
                 return True
 
-            logger.debug(f"SSH login not yet available for {name} ({result}). Waiting...")
+            logger.debug(
+                f"SSH login not yet available for {name} ({result}). Waiting..."
+            )
             time.sleep(10)
 
-        logger.error(f"Timeout reached waiting for SSH login to VM {name} using command '{check_command}'.")
+        logger.error(
+            f"Timeout reached waiting for SSH login to VM {name} using command '{check_command}'."
+        )
         return False
 
     def _find_node(self, identifier: str):
@@ -229,6 +288,7 @@ class OpenstackManager(CloudBaseManager):
             return conn.compute.find_server(identifier)
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.debug(f"Error finding server {identifier} via SDK: {e}")
             return None
 
@@ -238,10 +298,11 @@ class OpenstackManager(CloudBaseManager):
         """
         return self._find_node(name) is not None
 
-    def stop(self, name: Optional[str] = None) -> bool:
+    def stop(self, name: str | None = None) -> bool:
         """Stops an OpenStack VM."""
         if not name or not self.exists(name):
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"VM {name} not found in {self.cloud_name}")
             return False
         try:
@@ -251,21 +312,28 @@ class OpenstackManager(CloudBaseManager):
                 raise VMProviderError(f"VM {name} not found during stop attempt.")
 
             # Check for terminal Error state
-            if getattr(server, 'status', '').lower() == 'error':
+            if getattr(server, "status", "").lower() == "error":
                 from cloudmesh.ai.vm.logger import logger
-                logger.error(f"VM {name} is in ERROR state. Stop operation will not succeed.")
-                raise VMProviderError(f"VM {name} is in ERROR state and cannot be stopped.")
+
+                logger.error(
+                    f"VM {name} is in ERROR state. Stop operation will not succeed."
+                )
+                raise VMProviderError(
+                    f"VM {name} is in ERROR state and cannot be stopped."
+                )
 
             conn.compute.stop_server(server)
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"SDK stop failed for {name}: {e}")
             raise VMProviderError(f"SDK stop failed for {name}: {e}") from e
 
-    def shelve(self, name: Optional[str] = None) -> bool:
+    def shelve(self, name: str | None = None) -> bool:
         """Shelves an OpenStack VM (preserves disk, releases compute resources)."""
-        if not name: return False
+        if not name:
+            return False
         try:
             conn = self._get_sdk_conn()
             server = self._find_node(name)
@@ -275,12 +343,14 @@ class OpenstackManager(CloudBaseManager):
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"SDK shelve failed for {name}: {e}")
             return False
 
-    def unshelve(self, name: Optional[str] = None) -> bool:
+    def unshelve(self, name: str | None = None) -> bool:
         """Unshelves an OpenStack VM."""
-        if not name: return False
+        if not name:
+            return False
         try:
             conn = self._get_sdk_conn()
             server = self._find_node(name)
@@ -290,13 +360,15 @@ class OpenstackManager(CloudBaseManager):
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"SDK unshelve failed for {name}: {e}")
             return False
 
-    def delete(self, name: Optional[str] = None) -> bool:
+    def delete(self, name: str | None = None) -> bool:
         """Deletes an OpenStack VM and releases its floating IP."""
         if not name or not self.exists(name):
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"VM {name} not found in {self.cloud_name}")
             return False
         try:
@@ -311,10 +383,11 @@ class OpenstackManager(CloudBaseManager):
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"SDK delete failed for {name}: {e}")
             raise VMProviderError(f"SDK delete failed for {name}: {e}") from e
 
-    def list(self) -> List[Dict[str, Any]]:
+    def list(self) -> list[dict[str, Any]]:
         """Lists all OpenStack VMs with their reachable IP addresses using the SDK."""
         try:
             conn = self._get_sdk_conn()
@@ -324,26 +397,37 @@ class OpenstackManager(CloudBaseManager):
                 # Try to find a floating IP for the server
                 fip = None
                 # In openstacksdk, addresses are in a dict. We look for 'floating'
-                addresses = getattr(s, 'addresses', {})
-                if addresses and 'floating' in addresses:
-                    fip = addresses['floating'][0].get('addr') if addresses['floating'] else None
+                addresses = getattr(s, "addresses", {})
+                if addresses and "floating" in addresses:
+                    fip = (
+                        addresses["floating"][0].get("addr")
+                        if addresses["floating"]
+                        else None
+                    )
 
-                results.append({
-                    "name": s.name,
-                    "id": s.id,
-                    "status": s.status,
-                    "ip": fip or "No IP",
-                    "image": s.image.name if s.image else "Unknown",
-                    "flavor": s.flavor.name if s.flavor else "Unknown",
-                    "networks": [a.get('addr') for net in addresses.values() for a in net] if addresses else [],
-                })
+                results.append(
+                    {
+                        "name": s.name,
+                        "id": s.id,
+                        "status": s.status,
+                        "ip": fip or "No IP",
+                        "image": s.image.name if s.image else "Unknown",
+                        "flavor": s.flavor.name if s.flavor else "Unknown",
+                        "networks": [
+                            a.get("addr") for net in addresses.values() for a in net
+                        ]
+                        if addresses
+                        else [],
+                    }
+                )
             return results
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"SDK list failed: {e}")
             return []
 
-    def info(self, name: str, kind: str = "vm") -> Dict[str, Any]:
+    def info(self, name: str, kind: str = "vm") -> dict[str, Any]:
         """
         Gets detailed information about an OpenStack VM.
         """
@@ -353,26 +437,29 @@ class OpenstackManager(CloudBaseManager):
                 raise VMResourceError(f"VM {name} not found")
 
             floating_ip = self._get_floating_ip(name)
-            flavor = getattr(server, 'flavor', None)
+            flavor = getattr(server, "flavor", None)
 
             return {
-                "Name": getattr(server, 'name', name),
-                "ID": getattr(server, 'id', 'N/A'),
-                "State": getattr(server, 'status', 'Unknown'),
+                "Name": getattr(server, "name", name),
+                "ID": getattr(server, "id", "N/A"),
+                "State": getattr(server, "status", "Unknown"),
                 "FloatingIP": floating_ip or "Not Assigned",
-                "PublicIPs": getattr(server, 'public_ips', []),
-                "PrivateIPs": getattr(server, 'private_ips', []),
-                "RAM": getattr(flavor, 'ram', 'N/A'),
-                "CPUs": getattr(flavor, 'vcpus', 'N/A'),
+                "PublicIPs": getattr(server, "public_ips", []),
+                "PrivateIPs": getattr(server, "private_ips", []),
+                "RAM": getattr(flavor, "ram", "N/A"),
+                "CPUs": getattr(flavor, "vcpus", "N/A"),
             }
         except VMResourceError:
             raise
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
-            logger.error(f"Error getting info for VM {name} in {self.cloud_name}: {e}")
-            raise VMProviderError(f"Error getting info for VM {name} in {self.cloud_name}: {e}") from e
 
-    def login(self, name: Optional[str] = None) -> bool:
+            logger.error(f"Error getting info for VM {name} in {self.cloud_name}: {e}")
+            raise VMProviderError(
+                f"Error getting info for VM {name} in {self.cloud_name}: {e}"
+            ) from e
+
+    def login(self, name: str | None = None) -> bool:
         """
         Provides the SSH connection string for the OpenStack VM.
         """
@@ -382,21 +469,26 @@ class OpenstackManager(CloudBaseManager):
 
         floating_ip = self._get_floating_ip(name)
         if not floating_ip:
-            self.print(f"No floating IP found for VM {name}. Use 'cmc vm assign-floating-ip' first.")
+            self.print(
+                f"No floating IP found for VM {name}. Use 'cmc vm assign-floating-ip' first."
+            )
             return False
 
         cloud_config = self.get_cloud_config(self.cloud_name)
         key_path = cloud_config.get("key_path", "~/.ssh/id_rsa")
         user = cloud_config.get("user", "ubuntu")
 
-        self.print(f"Connect to your VM using:\nssh -i {key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {user}@{floating_ip}")
+        self.print(
+            f"Connect to your VM using:\nssh -i {key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {user}@{floating_ip}"
+        )
         return True
 
-    def suspend(self, name: Optional[str] = None) -> bool:
+    def suspend(self, name: str | None = None) -> bool:
         """
         Suspends an OpenStack VM.
         """
-        if not name: return False
+        if not name:
+            return False
         try:
             node = self.driver.get_node(name)
             self.driver.suspend_node(node)
@@ -405,9 +497,10 @@ class OpenstackManager(CloudBaseManager):
             self.print(f"Error suspending node {name}: {e}")
             return False
 
-    def suspend(self, name: Optional[str] = None) -> bool:
+    def suspend(self, name: str | None = None) -> bool:
         """Suspends an OpenStack VM."""
-        if not name: return False
+        if not name:
+            return False
         try:
             conn = self._get_sdk_conn()
             server = self._find_node(name)
@@ -417,12 +510,14 @@ class OpenstackManager(CloudBaseManager):
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"SDK suspend failed for {name}: {e}")
             return False
 
-    def restart(self, name: Optional[str] = None) -> bool:
+    def restart(self, name: str | None = None) -> bool:
         """Restarts an OpenStack VM."""
-        if not name: return False
+        if not name:
+            return False
         try:
             conn = self._get_sdk_conn()
             server = self._find_node(name)
@@ -432,15 +527,17 @@ class OpenstackManager(CloudBaseManager):
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"SDK restart failed for {name}: {e}")
             return False
 
-    def get_images(self, **kwargs) -> List[Dict[str, Any]]:
+    def get_images(self, **kwargs) -> builtins.list[dict[str, Any]]:
         """
         Lists available images in OpenStack.
         """
         try:
             from cloudmesh.ai.vm.logger import logger
+
             logger.debug("Fetching images from OpenStack SDK...")
             conn = self._get_sdk_conn()
             sdk_images = conn.compute.images()
@@ -449,28 +546,34 @@ class OpenstackManager(CloudBaseManager):
             return images_list
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error getting images: {e}")
             return []
 
-    def get_flavors(self, **kwargs) -> List[Dict[str, Any]]:
+    def get_flavors(self, **kwargs) -> builtins.list[dict[str, Any]]:
         """
         Lists available flavors in OpenStack.
         """
         try:
             from cloudmesh.ai.vm.logger import logger
+
             logger.debug("Fetching flavors from OpenStack SDK...")
             conn = self._get_sdk_conn()
             sdk_flavors = conn.compute.flavors()
-            flavors = [{"id": f.id, "name": f.name, "ram": f.ram, "vcpus": f.vcpus} for f in sdk_flavors]
+            flavors = [
+                {"id": f.id, "name": f.name, "ram": f.ram, "vcpus": f.vcpus}
+                for f in sdk_flavors
+            ]
             logger.debug(f"SDK returned {len(flavors)} flavors.")
             return flavors
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error getting flavors: {e}")
             return []
             return []
 
-    def get_keys(self) -> List[Dict[str, Any]]:
+    def get_keys(self) -> builtins.list[dict[str, Any]]:
         """
         Lists available keys in OpenStack using the SDK.
         """
@@ -480,10 +583,11 @@ class OpenstackManager(CloudBaseManager):
             return [{"name": k.name, "fingerprint": k.fingerprint} for k in keys]
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error listing OpenStack keys: {e}")
             return []
 
-    def get_security_groups(self) -> List[Dict[str, Any]]:
+    def get_security_groups(self) -> builtins.list[dict[str, Any]]:
         """
         Lists available security groups in OpenStack using the SDK.
         """
@@ -493,10 +597,11 @@ class OpenstackManager(CloudBaseManager):
             return [{"name": g.name, "description": g.description} for g in groups]
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error listing security groups: {e}")
             return []
 
-    def get_security_group_info(self, name: str) -> Dict[str, Any]:
+    def get_security_group_info(self, name: str) -> dict[str, Any]:
         """
         Gets detailed information for a specific security group using the SDK.
         """
@@ -512,8 +617,11 @@ class OpenstackManager(CloudBaseManager):
             raise VMResourceError(f"Security group {name} not found")
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error getting security group info for {name}: {e}")
-            raise VMProviderError(f"Could not get security group info for {name} in {self.cloud_name}: {e}") from e
+            raise VMProviderError(
+                f"Could not get security group info for {name} in {self.cloud_name}: {e}"
+            ) from e
 
     def create_security_group(self, name: str, description: str = "") -> bool:
         """Creates a security group in OpenStack using the SDK."""
@@ -523,6 +631,7 @@ class OpenstackManager(CloudBaseManager):
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error creating security group {name}: {e}")
             return False
 
@@ -537,6 +646,7 @@ class OpenstackManager(CloudBaseManager):
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error deleting security group {name}: {e}")
             return False
 
@@ -552,6 +662,7 @@ class OpenstackManager(CloudBaseManager):
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error adding security group {sg_name} to VM {vm_name}: {e}")
             return False
 
@@ -566,10 +677,20 @@ class OpenstackManager(CloudBaseManager):
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
-            logger.error(f"Error removing security group {sg_name} from VM {vm_name}: {e}")
+
+            logger.error(
+                f"Error removing security group {sg_name} from VM {vm_name}: {e}"
+            )
             return False
 
-    def add_security_group_rule(self, sg_name: str, protocol: str, port: str, cidr: str, direction: str = "ingress") -> str:
+    def add_security_group_rule(
+        self,
+        sg_name: str,
+        protocol: str,
+        port: str,
+        cidr: str,
+        direction: str = "ingress",
+    ) -> str:
         """
         Adds a security group rule. Returns the rule ID.
         """
@@ -585,13 +706,16 @@ class OpenstackManager(CloudBaseManager):
                 protocol=protocol,
                 port_range_min=int(port) if port.isdigit() else None,
                 port_range_max=int(port) if port.isdigit() else None,
-                remote_ip_prefix=cidr
+                remote_ip_prefix=cidr,
             )
             return rule.id
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error adding security group rule to {sg_name}: {e}")
-            raise VMProviderError(f"Could not add security group rule for {sg_name} in {self.cloud_name}: {e}") from e
+            raise VMProviderError(
+                f"Could not add security group rule for {sg_name} in {self.cloud_name}: {e}"
+            ) from e
 
     def remove_security_group_rule(self, sg_name: str, rule_id: str) -> bool:
         """Removes a rule by ID."""
@@ -601,10 +725,11 @@ class OpenstackManager(CloudBaseManager):
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error removing security group rule {rule_id}: {e}")
             return False
 
-    def list_security_group_rules(self, sg_name: str) -> List[Dict[str, Any]]:
+    def list_security_group_rules(self, sg_name: str) -> builtins.list[dict[str, Any]]:
         """Lists rules for a group."""
         try:
             conn = self._get_sdk_conn()
@@ -613,32 +738,38 @@ class OpenstackManager(CloudBaseManager):
                 return []
 
             rules = conn.network.security_group_rules(security_group_id=sg.id)
-            return [{
-                "id": r.id,
-                "protocol": r.protocol,
-                "port_range_min": r.port_range_min,
-                "port_range_max": r.port_range_max,
-                "remote_ip": r.remote_ip_prefix,
-            } for r in rules]
+            return [
+                {
+                    "id": r.id,
+                    "protocol": r.protocol,
+                    "port_range_min": r.port_range_min,
+                    "port_range_max": r.port_range_max,
+                    "remote_ip": r.remote_ip_prefix,
+                }
+                for r in rules
+            ]
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error listing rules for {sg_name}: {e}")
             return []
 
     @property
-    def version(self) -> List[str]:
+    def version(self) -> builtins.list[str]:
         """
         Returns a list of version strings for the openstack CLI tool, libcloud, and CHI (for Chameleon).
         """
         versions = []
         try:
             import openstack
+
             versions.append(f"SDK: {openstack.__version__}")
         except Exception:
             versions.append("SDK: Unknown")
 
         try:
             import libcloud
+
             versions.append(f"libcloud: {libcloud.__version__}")
         except Exception:
             versions.append("libcloud: Unknown")
@@ -647,6 +778,7 @@ class OpenstackManager(CloudBaseManager):
         if self.cloud_name == "chameleon":
             try:
                 import chi
+
                 versions.append(f"CHI: {chi.__version__}")
             except Exception:
                 versions.append("CHI: Unknown")
@@ -659,16 +791,20 @@ class OpenstackManager(CloudBaseManager):
         """
         try:
             import openstack
+
             return True
         except ImportError:
             return False
 
-    def upload_key(self, key_path: str, key_name: str, vm_name: Optional[str] = None) -> bool:
+    def upload_key(
+        self, key_path: str, key_name: str, vm_name: str | None = None
+    ) -> bool:
         """
         Uploads a public key to OpenStack using the SDK.
         """
         try:
             import os
+
             key_path = os.path.expanduser(key_path)
             if not os.path.exists(key_path):
                 return False
@@ -685,10 +821,11 @@ class OpenstackManager(CloudBaseManager):
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error uploading key {key_name}: {e}")
             return False
 
-    def delete_key(self, key_name: str, vm_name: Optional[str] = None) -> bool:
+    def delete_key(self, key_name: str, vm_name: str | None = None) -> bool:
         """
         Deletes a public key from OpenStack using the SDK.
         """
@@ -698,10 +835,11 @@ class OpenstackManager(CloudBaseManager):
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error deleting key {key_name}: {e}")
             return False
 
-    def _get_default_network(self) -> Optional[str]:
+    def _get_default_network(self) -> str | None:
         """
         Finds a default network to use for VM creation.
         Checks config first, then tries to find a usable network via SDK.
@@ -719,11 +857,12 @@ class OpenstackManager(CloudBaseManager):
                 return networks[0].name
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.debug(f"Could not find a default network for {self.cloud_name}: {e}")
 
         return None
 
-    def _get_floating_ip(self, name: str) -> Optional[str]:
+    def _get_floating_ip(self, name: str) -> str | None:
         """
         Internal helper to retrieve the floating IP address of a VM.
         """
@@ -741,6 +880,7 @@ class OpenstackManager(CloudBaseManager):
 
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.debug(f"Error retrieving floating IP for {name}: {e}")
 
         return None
@@ -751,6 +891,7 @@ class OpenstackManager(CloudBaseManager):
         Returns True if private IPs are assigned, False otherwise.
         """
         import time
+
         from cloudmesh.ai.vm.logger import logger
 
         logger.info(f"Probing network readiness for VM {node.name}...")
@@ -758,26 +899,33 @@ class OpenstackManager(CloudBaseManager):
         while time.time() - start_time < timeout:
             # Refresh node state from driver
             node = self._find_node(node.name)
-            if node and getattr(node, 'private_ips', None):
-                logger.info(f"Network is ready for {node.name} (Private IPs: {node.private_ips}).")
+            if node and getattr(node, "private_ips", None):
+                logger.info(
+                    f"Network is ready for {node.name} (Private IPs: {node.private_ips})."
+                )
                 return True
 
-            state = getattr(node, 'state', 'unknown') if node else 'not found'
-            logger.info(f"Network not ready for {node.name} yet (State: {state}). Waiting 5s...")
+            state = getattr(node, "state", "unknown") if node else "not found"
+            logger.info(
+                f"Network not ready for {node.name} yet (State: {state}). Waiting 5s..."
+            )
             time.sleep(5)
 
-        logger.error(f"Timeout reached waiting for network readiness for VM {node.name}.")
+        logger.error(
+            f"Timeout reached waiting for network readiness for VM {node.name}."
+        )
         return False
 
-    def assign_floating_ip(self, name: str) -> Optional[str]:
+    def assign_floating_ip(self, name: str) -> str | None:
         """
         Assigns an available floating IP to the VM.
         Tries to create a new one, falling back to available pools or existing free IPs.
         Handles the case where the instance network is not ready yet by probing.
         """
         try:
-            from cloudmesh.ai.vm.logger import logger
             import time
+
+            from cloudmesh.ai.vm.logger import logger
 
             node = self._find_node(name)
             if not node:
@@ -786,7 +934,9 @@ class OpenstackManager(CloudBaseManager):
 
             # Ensure the VM is active and network is ready before assigning FIP
             if not self.wait_for_active(name):
-                logger.error(f"VM {name} failed to become active. Skipping floating IP assignment.")
+                logger.error(
+                    f"VM {name} failed to become active. Skipping floating IP assignment."
+                )
                 return None
 
             network_ready = self._wait_for_network(node)
@@ -799,7 +949,9 @@ class OpenstackManager(CloudBaseManager):
 
             try:
                 # 1. Try to create a floating IP using the specified or default pool
-                logger.debug(f"Attempting to create floating IP from pool '{pool_name}'...")
+                logger.debug(
+                    f"Attempting to create floating IP from pool '{pool_name}'..."
+                )
                 pool = conn.network.find_network(pool_name)
                 if pool:
                     fip = conn.network.create_floating_ip(floating_network_id=pool.id)
@@ -808,31 +960,43 @@ class OpenstackManager(CloudBaseManager):
             except Exception as e:
                 err_msg = str(e)
                 if "pool not found" in err_msg.lower() or "404" in err_msg:
-                    logger.debug(f"Pool '{pool_name}' not found, trying to find any available pools...")
+                    logger.debug(
+                        f"Pool '{pool_name}' not found, trying to find any available pools..."
+                    )
                     pools = conn.network.floating_ip_pools()
                     if pools:
                         try:
                             # Try the first available pool found by the SDK
                             fallback_pool = pools[0]
-                            logger.debug(f"Trying fallback pool '{fallback_pool.name}'...")
-                            fip = conn.network.create_floating_ip(floating_network_id=fallback_pool.id)
+                            logger.debug(
+                                f"Trying fallback pool '{fallback_pool.name}'..."
+                            )
+                            fip = conn.network.create_floating_ip(
+                                floating_network_id=fallback_pool.id
+                            )
                         except Exception as pool_e:
-                            logger.warning(f"Failed to create FIP from fallback pool {fallback_pool.name}: {pool_e}")
+                            logger.warning(
+                                f"Failed to create FIP from fallback pool {fallback_pool.name}: {pool_e}"
+                            )
                     else:
                         logger.warning("No floating IP pools found on this cloud.")
                 else:
-                    logger.debug(f"Creation failed with error: {err_msg}. Trying fallback to existing IPs...")
+                    logger.debug(
+                        f"Creation failed with error: {err_msg}. Trying fallback to existing IPs..."
+                    )
 
             if not fip:
                 # 2. Fallback: Try to find an existing FREE floating IP
                 logger.debug("Attempting to find an existing FREE floating IP...")
                 all_fips = conn.network.floating_ips()
                 # In SDK, a floating IP is free if it's not associated with a port (fixed_ip is None/missing)
-                free_fips = [f for f in all_fips if not getattr(f, 'fixed_ip', None)]
+                free_fips = [f for f in all_fips if not getattr(f, "fixed_ip", None)]
                 if free_fips:
                     fip = free_fips[0]
                 else:
-                    logger.warning("No free floating IPs available and could not create a new one.")
+                    logger.warning(
+                        "No free floating IPs available and could not create a new one."
+                    )
 
             if fip:
                 # Attempt to attach the floating IP.
@@ -845,9 +1009,13 @@ class OpenstackManager(CloudBaseManager):
                         err_msg = str(e)
                         if "Instance network is not ready yet" in err_msg:
                             if not network_ready and i == max_retries - 1:
-                                logger.error(f"Network never became ready for {name}, and final attach attempt failed: {e}")
+                                logger.error(
+                                    f"Network never became ready for {name}, and final attach attempt failed: {e}"
+                                )
                             elif i < max_retries - 1:
-                                logger.warning(f"Network still not ready for {name}, retrying in 5s... ({i+1}/{max_retries})")
+                                logger.warning(
+                                    f"Network still not ready for {name}, retrying in 5s... ({i + 1}/{max_retries})"
+                                )
                                 time.sleep(5)
                                 continue
                         raise e
@@ -856,9 +1024,12 @@ class OpenstackManager(CloudBaseManager):
 
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             err_msg = str(e)
             if "quota" in err_msg.lower():
-                logger.error(f"Floating IP quota reached for cloud '{self.cloud_name}'.")
+                logger.error(
+                    f"Floating IP quota reached for cloud '{self.cloud_name}'."
+                )
             else:
                 logger.error(f"Error assigning floating IP to {name}: {e}")
             return None
@@ -871,11 +1042,12 @@ class OpenstackManager(CloudBaseManager):
             node = self._find_node(name)
             if not node:
                 from cloudmesh.ai.vm.logger import logger
+
                 logger.error(f"VM {name} not found in {self.cloud_name}")
                 return False
 
             # Find floating IPs
-            fips = getattr(node, 'public_ips', [])
+            fips = getattr(node, "public_ips", [])
             if not fips:
                 return False
 
@@ -894,6 +1066,7 @@ class OpenstackManager(CloudBaseManager):
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error releasing floating IP for {name}: {e}")
             return False
 
@@ -910,17 +1083,21 @@ class OpenstackManager(CloudBaseManager):
             key_path = cloud_config.get("key_path", "~/.ssh/id_rsa")
             user = cloud_config.get("user", "ubuntu")
 
-            import subprocess
             import os
+            import subprocess
+
             key_path = os.path.expanduser(key_path)
 
             ssh_cmd = [
                 "ssh",
-                "-i", key_path,
-                "-o", "StrictHostKeyChecking=no",
-                "-o", "UserKnownHostsFile=/dev/null",
+                "-i",
+                key_path,
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-o",
+                "UserKnownHostsFile=/dev/null",
                 f"{user}@{floating_ip}",
-                cmd
+                cmd,
             ]
 
             result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=30)
@@ -933,7 +1110,7 @@ class OpenstackManager(CloudBaseManager):
         except Exception as e:
             return f"Unexpected error executing command: {e}"
 
-    def validate_config(self) -> Dict[str, List[str]]:
+    def validate_config(self) -> dict[str, builtins.list[str]]:
         """
         Validates OpenStack specific configuration.
         """
@@ -955,7 +1132,7 @@ class OpenstackManager(CloudBaseManager):
 
         return errors_map
 
-    def get_provider_info(self) -> Dict[str, Any]:
+    def get_provider_info(self) -> dict[str, Any]:
         """Gets detailed information about the OpenStack provider."""
         info = {
             "provider": "OpenStack",
@@ -967,10 +1144,12 @@ class OpenstackManager(CloudBaseManager):
             conn = self._get_sdk_conn()
             # The SDK connection object provides access to the underlying connection details
             # which include the auth URL and region.
-            info.update({
-                "region": conn.region,
-                "auth_url": conn.auth.auth_url,
-            })
+            info.update(
+                {
+                    "region": conn.region,
+                    "auth_url": conn.auth.auth_url,
+                }
+            )
         except Exception:
             pass
 
@@ -979,9 +1158,9 @@ class OpenstackManager(CloudBaseManager):
     def _get_current_status(self, name: str) -> str:
         """Returns the current status of the OpenStack VM."""
         node = self._find_node(name)
-        return getattr(node, 'state', '') if node else ''
+        return getattr(node, "state", "") if node else ""
 
     def _normalize_status(self, status: str) -> str:
         """Normalizes status, treating 'active' as 'running'."""
         normalized = super()._normalize_status(status)
-        return 'running' if normalized == 'active' else normalized
+        return "running" if normalized == "active" else normalized

@@ -1,17 +1,18 @@
-import os
-import yaml
-import pytest
-import uuid
-import time
 import subprocess
-from cloudmesh.ai.vm.state_manager import StateManager
-from cloudmesh.ai.vm.factory import factory
-from src.cloudmesh.ai.vm.openstack.ChameleonManager import Provider as ChameleonProvider
+import uuid
+
+import pytest
+import yaml
 from cloudmesh.ai.common.stopwatch import StopWatch
+
+from cloudmesh.ai.vm.factory import factory
+from cloudmesh.ai.vm.state_manager import StateManager
+from src.cloudmesh.ai.vm.openstack.ChameleonManager import Provider as ChameleonProvider
 from tests.smoke.benchmark_helper import save_benchmark
 
 # Register the provider in the factory for the test
 factory.register("chameleon", ChameleonProvider)
+
 
 @pytest.fixture
 def temp_config(tmp_path):
@@ -27,13 +28,14 @@ def temp_config(tmp_path):
                 "image": "CC-Ubuntu22.04",
                 "flavor": "m1.small",
             }
-        }
+        },
     }
 
     with open(config_file, "w") as f:
         yaml.dump(config_data, f)
 
     return str(config_file)
+
 
 @pytest.fixture
 def ssh_key(tmp_path):
@@ -44,10 +46,11 @@ def ssh_key(tmp_path):
     subprocess.run(
         ["ssh-keygen", "-t", "rsa", "-b", "2048", "-f", str(key_path), "-N", ""],
         check=True,
-        capture_output=True
+        capture_output=True,
     )
 
     return str(key_path), str(pub_key_path)
+
 
 def test_chameleon_smoke(temp_config, ssh_key):
     """
@@ -119,8 +122,12 @@ def test_chameleon_smoke(temp_config, ssh_key):
             # Note: Chameleon provider doesn't implement run_command, so we use the base helper
             # We need the user from config
             user = cloud_config.get("user", "ubuntu")
-            hostname = provider._execute_ssh_command(fip, user, priv_key_path, "hostname")
-            assert "Error" not in hostname, f"Connectivity check failed for {vm_name}: {hostname}"
+            hostname = provider._execute_ssh_command(
+                fip, user, priv_key_path, "hostname"
+            )
+            assert "Error" not in hostname, (
+                f"Connectivity check failed for {vm_name}: {hostname}"
+            )
             print(f"Connectivity check successful. Hostname: {hostname}")
 
         # SSH Key Management
@@ -140,7 +147,9 @@ def test_chameleon_smoke(temp_config, ssh_key):
             # If grep -q succeeds, stdout is empty, but returncode is 0.
             # Wait, _execute_ssh_command uses subprocess.run and returns stdout.
             # If returncode != 0, it returns "SSH Error (code X): ..."
-            assert "SSH Error" not in result, f"SSH key was not found in {vm_name}'s authorized_keys"
+            assert "SSH Error" not in result, (
+                f"SSH key was not found in {vm_name}'s authorized_keys"
+            )
             print("SSH key verified successfully.")
 
         with StopWatch.timer("chameleon_delete_key"):
@@ -150,8 +159,12 @@ def test_chameleon_smoke(temp_config, ssh_key):
         with StopWatch.timer("chameleon_verify_key_deleted"):
             print("Verifying SSH key is removed...")
             verify_cmd_del = f"grep -q '{escaped_key}' ~/.ssh/authorized_keys"
-            result_del = provider._execute_ssh_command(fip, user, priv_key_path, verify_cmd_del)
-            assert "SSH Error" in result_del, f"SSH key should have been removed from {vm_name}"
+            result_del = provider._execute_ssh_command(
+                fip, user, priv_key_path, verify_cmd_del
+            )
+            assert "SSH Error" in result_del, (
+                f"SSH key should have been removed from {vm_name}"
+            )
             print("SSH key removal verified.")
 
         # Test info

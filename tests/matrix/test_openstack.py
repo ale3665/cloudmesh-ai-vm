@@ -1,6 +1,6 @@
-import pytest
 from cloudmesh.ai.vm.openstack.OpenstackManager import OpenstackManager
 from tests.matrix.base import MatrixTestBase
+
 
 class TestOpenstackMatrix(MatrixTestBase):
     def test_capabilities(self):

@@ -1,16 +1,19 @@
-from typing import Dict, Type, Optional, Any
+from typing import Any
+
 from cloudmesh.ai.vm.CloudBaseManager import CloudBaseManager
 from cloudmesh.ai.vm.exceptions import VMProviderError
 from cloudmesh.ai.vm.logger import logger
+
 
 class ProviderFactory:
     """
     Registry-based factory for creating cloud provider managers.
     """
-    _registry: Dict[str, Type[CloudBaseManager]] = {}
+
+    _registry: dict[str, type[CloudBaseManager]] = {}
 
     @classmethod
-    def register(cls, name: str, manager_cls: Type[CloudBaseManager]):
+    def register(cls, name: str, manager_cls: type[CloudBaseManager]):
         cls._registry[name] = manager_cls
         logger.debug(f"Registered provider: {name} -> {manager_cls.__name__}")
 
@@ -21,10 +24,13 @@ class ProviderFactory:
             # Fallback to checking if it's a generic libcloud provider
             # In a real system, we might have a default LibcloudManager implementation
             # that handles many providers via config.
-            raise VMProviderError(f"Provider '{cloud_name}' is not registered in the factory.")
+            raise VMProviderError(
+                f"Provider '{cloud_name}' is not registered in the factory."
+            )
 
         # Pass the GlobalConfig object itself, the cloud_name, and the console
         return manager_cls(config, cloud_name=cloud_name, console=console)
+
 
 # The factory is used as a singleton across the app
 factory = ProviderFactory()

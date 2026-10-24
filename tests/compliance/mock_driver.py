@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 class MockNode:
     def __init__(self, name="mock-node", node_id="mock-id"):
         self.name = name
@@ -11,16 +9,16 @@ class MockNode:
 
     def stop(self):
         """Stop the node."""
-        pass
 
     def destroy(self):
         """Destroy the node."""
-        pass
+
 
 class MockImage:
     def __init__(self, name="mock-image", image_id="mock-img-id"):
         self.name = name
         self.id = image_id
+
 
 class MockSize:
     def __init__(self, name="mock-size", size_id="mock-size-id"):
@@ -29,20 +27,22 @@ class MockSize:
         self.ram = 2048
         self.vcpus = 2
 
+
 class MockDriver:
     """
     A mock driver that implements the libcloud interface used by LibcloudManager.
     """
-    def list_nodes(self) -> List[MockNode]:
+
+    def list_nodes(self) -> list[MockNode]:
         return []
 
-    def get_node(self, name: str) -> Optional[MockNode]:
+    def get_node(self, name: str) -> MockNode | None:
         return None
 
-    def list_images(self) -> List[MockImage]:
+    def list_images(self) -> list[MockImage]:
         return []
 
-    def list_sizes(self) -> List[MockSize]:
+    def list_sizes(self) -> list[MockSize]:
         return []
 
     def create_node(self, name, image, size) -> MockNode:
@@ -66,10 +66,12 @@ class MockDriver:
     def unshelve_node(self, node):
         pass
 
+
 class MockDriverFactory:
     """
     Factory for creating MockDriver instances.
     """
+
     @staticmethod
     def get_driver() -> MockDriver:
         return MockDriver()

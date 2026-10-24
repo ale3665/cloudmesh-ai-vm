@@ -1,20 +1,21 @@
-import pytest
 import re
-import json
-from rich.text import Text
-from click.testing import CliRunner
-from cloudmesh.ai.command import vm
-from cloudmesh.ai.common.stopwatch import StopWatch
-
-from tests.smoke.cli_helper import setup_cli_config
 from pprint import pprint
+
+import pytest
+from click.testing import CliRunner
+from rich.text import Text
+
+from cloudmesh.ai.command import vm
+from tests.smoke.cli_helper import setup_cli_config
+
 
 @pytest.fixture
 def runner():
     return CliRunner()
 
+
 #
-# THIS FIXTURE IS WRONG IT should be read from 
+# THIS FIXTURE IS WRONG IT should be read from
 # ~/.config/cloudmesh/clouds.yaml
 # authis read from ~/.config/openstack/clouds.yaml
 #
@@ -26,7 +27,7 @@ def config(tmp_path, runner):
         "key_path": "~/.ssh/id_rsa",
     }
     setup_cli_config(tmp_path, "jetstream", provider_config)
-    
+
     # Read username from clouds.yaml
     config_path = os.path.expanduser("~/.config/cloudmesh/clouds.yaml")
     try:
@@ -41,6 +42,7 @@ def config(tmp_path, runner):
     provider_config["vm_name"] = vm_name
 
     pprint(provider_config)
+
 
 def test_jetstream_cli_lifecycle(runner, config):
     """
@@ -58,13 +60,14 @@ def test_jetstream_cli_lifecycle(runner, config):
     # 3. start (without name - test auto-naming)
     result = runner.invoke(vm.vm_group, ["start"])
     if result.exit_code != 0:
-        pytest.skip(f"Jetstream start failed (expected without real credentials): {result.output}")
+        pytest.skip(
+            f"Jetstream start failed (expected without real credentials): {result.output}"
+        )
 
     output = Text.from_ansi(result.output).plain
     assert "Generating VM name" in output
 
     # Extract the generated VM name
-    import re
     match = re.search(r"Successfully started VM ([\w-]+)", result.output)
     if match:
         vm_name = match.group(1)
@@ -73,18 +76,16 @@ def test_jetstream_cli_lifecycle(runner, config):
         vm_name = "smoke-jetstream-vm"
 
     try:
-        
         # 4. list
         # 4. list
         result = runner.invoke(vm.vm_group, ["list"])
         assert result.exit_code == 0
-        
-        # Extract the base prefix (e.g., 'smoke-chameleon-vm' or whatever your prefix is) 
+
+        # Extract the base prefix (e.g., 'smoke-chameleon-vm' or whatever your prefix is)
         # to avoid truncation issues entirely.
         base_prefix = vm_name.rsplit("-", 1)[0]
         assert base_prefix in result.output
-        
-    
+
         # 5. stop
         result = runner.invoke(vm.vm_group, ["stop", vm_name])
         if result.exit_code != 0:
@@ -138,6 +139,7 @@ def test_jetstream_cli_lifecycle(runner, config):
         # Cleanup
         runner.invoke(vm.vm_group, ["delete", vm_name])
         save_benchmark(tag="Jetstream CLI", config_path=None)
+
 
 def test_jetstream_cli_start_with_name(runner, config):
     """

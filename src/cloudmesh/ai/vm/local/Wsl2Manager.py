@@ -1,9 +1,15 @@
-import subprocess
-import re
+import builtins
 import shutil
-from typing import List, Dict, Any, Optional
+from typing import Any
+
+from cloudmesh.ai.vm.exceptions import (
+    ConfigError,
+    VMProviderError,
+    VMResourceError,
+)
+
 from ..LocalBaseManager import LocalBaseManager
-from cloudmesh.ai.vm.exceptions import VMProviderError, ConfigError, VMResourceError, VMAuthError, VMNetworkError
+
 
 class Provider(LocalBaseManager):
     """
@@ -15,7 +21,7 @@ class Provider(LocalBaseManager):
         super().__init__(config, console=console, **kwargs)
         self.cloud_name = "wsl2"
 
-    def _get_wsl_binary(self) -> Optional[str]:
+    def _get_wsl_binary(self) -> str | None:
         """Return the most portable WSL binary for the current environment."""
         if shutil.which("wsl.exe"):
             return "wsl.exe"
@@ -38,7 +44,13 @@ class Provider(LocalBaseManager):
                 pass
         return output
 
-    def start(self, name: Optional[str] = None, flavor: Optional[str] = None, image: Optional[str] = None, **kwargs) -> str:
+    def start(
+        self,
+        name: str | None = None,
+        flavor: str | None = None,
+        image: str | None = None,
+        **kwargs,
+    ) -> str:
         """
         Starts a WSL2 distribution.
         If the distribution doesn't exist, it attempts to import it from a rootfs image.
@@ -52,7 +64,9 @@ class Provider(LocalBaseManager):
                 self._run_command([self._get_wsl_binary(), "-d", name])
                 return name
             except Exception as e:
-                raise VMProviderError(f"Failed to start existing WSL2 distribution {name}: {e}")
+                raise VMProviderError(
+                    f"Failed to start existing WSL2 distribution {name}: {e}"
+                )
 
         # Attempt to import if not exists
         cloud_config = self.get_cloud_config("wsl2")
@@ -61,17 +75,23 @@ class Provider(LocalBaseManager):
         install_dir = cloud_config.get("install_dir", "C:\\WSL")
 
         if not rootfs:
-            raise ConfigError(f"Rootfs image path not configured in YAML for wsl2. Cannot import {name}.")
+            raise ConfigError(
+                f"Rootfs image path not configured in YAML for wsl2. Cannot import {name}."
+            )
 
         try:
             # wsl --import <Distro> <InstallLocation> <FileName>
-            self._run_command([self._get_wsl_binary(), "--import", name, install_dir, rootfs])
+            self._run_command(
+                [self._get_wsl_binary(), "--import", name, install_dir, rootfs]
+            )
             self._run_command([self._get_wsl_binary(), "-d", name])
             return name
         except Exception as e:
-            raise VMProviderError(f"Failed to import and start WSL2 distribution {name}: {e}")
+            raise VMProviderError(
+                f"Failed to import and start WSL2 distribution {name}: {e}"
+            )
 
-    def stop(self, name: Optional[str] = None) -> bool:
+    def stop(self, name: str | None = None) -> bool:
         """
         Stops (terminates) a WSL2 distribution.
         """
@@ -84,7 +104,7 @@ class Provider(LocalBaseManager):
         except Exception as e:
             raise VMProviderError(f"Failed to stop WSL2 distribution {name}: {e}")
 
-    def delete(self, name: Optional[str] = None) -> bool:
+    def delete(self, name: str | None = None) -> bool:
         """
         Deletes (unregisters) a WSL2 distribution.
         """
@@ -97,7 +117,7 @@ class Provider(LocalBaseManager):
         except Exception as e:
             raise VMProviderError(f"Failed to delete WSL2 distribution {name}: {e}")
 
-    def list(self) -> List[Dict[str, Any]]:
+    def list(self) -> list[dict[str, Any]]:
         """
         Lists WSL2 distributions.
         """
@@ -113,16 +133,18 @@ class Provider(LocalBaseManager):
                 if parts and parts[0] == "*":
                     parts = parts[1:]
                 if len(parts) >= 2:
-                    vms.append({
-                        "name": parts[0],
-                        "state": parts[1],
-                        "version": parts[2] if len(parts) > 2 else "Unknown"
-                    })
+                    vms.append(
+                        {
+                            "name": parts[0],
+                            "state": parts[1],
+                            "version": parts[2] if len(parts) > 2 else "Unknown",
+                        }
+                    )
             return vms
         except Exception:
             return []
 
-    def login(self, name: Optional[str] = None) -> bool:
+    def login(self, name: str | None = None) -> bool:
         """
         Logs into a WSL2 distribution.
         """
@@ -137,13 +159,13 @@ class Provider(LocalBaseManager):
         except Exception:
             return False
 
-    def suspend(self, name: Optional[str] = None) -> bool:
+    def suspend(self, name: str | None = None) -> bool:
         """
         WSL2 doesn't have a 'suspend' mode; we use terminate.
         """
         return self.stop(name)
 
-    def restart(self, name: Optional[str] = None) -> bool:
+    def restart(self, name: str | None = None) -> bool:
         """
         Restarts a WSL2 distribution.
         """
@@ -156,25 +178,25 @@ class Provider(LocalBaseManager):
         except Exception:
             return False
 
-    def get_flavors(self, **kwargs) -> List[Dict[str, Any]]:
+    def get_flavors(self, **kwargs) -> builtins.list[dict[str, Any]]:
         """
         WSL2 does not have 'flavors' in the cloud sense.
         """
         return [{"name": "standard", "description": "Default WSL2 Resource allocation"}]
 
-    def get_keys(self) -> List[Dict[str, Any]]:
+    def get_keys(self) -> builtins.list[dict[str, Any]]:
         """
         WSL2 uses local user keys.
         """
         return [{"name": "local-user-key", "path": "~/.ssh/id_rsa"}]
 
-    def get_security_groups(self) -> List[Dict[str, Any]]:
+    def get_security_groups(self) -> builtins.list[dict[str, Any]]:
         """
         WSL2 uses host firewall/networking.
         """
         return [{"name": "default", "description": "Host network access"}]
 
-    def link_ssh_dir(self, name: Optional[str] = None) -> bool:
+    def link_ssh_dir(self, name: str | None = None) -> bool:
         """
         Creates a symbolic link from the WSL2 home .ssh directory
         to the host OS's .ssh directory.
@@ -188,7 +210,9 @@ class Provider(LocalBaseManager):
         host_user = cloud_config.get("host_username")
 
         if not wsl_user or not host_user:
-            self.print("Error: 'wsl_username' and 'host_username' must be configured in clouds.yaml to link SSH directory.")
+            self.print(
+                "Error: 'wsl_username' and 'host_username' must be configured in clouds.yaml to link SSH directory."
+            )
             return False
 
         # Try to determine host SSH path. Default to /mnt/c/Users but allow config override.
@@ -199,15 +223,41 @@ class Provider(LocalBaseManager):
         try:
             # Use 'ln -sf' to replace existing symlinks, but avoid 'rm -rf' on directories to prevent data loss.
             # First, check if it's a directory and not a link.
-            check_cmd = f"[ -d {wsl_ssh_path} ] && [ ! -L {wsl_ssh_path} ] && echo 'exists'"
-            check_result = self._run_command([self._get_wsl_binary() or "wsl.exe", "-d", name, "-u", "root", "sh", "-c", check_cmd])
+            check_cmd = (
+                f"[ -d {wsl_ssh_path} ] && [ ! -L {wsl_ssh_path} ] && echo 'exists'"
+            )
+            check_result = self._run_command(
+                [
+                    self._get_wsl_binary() or "wsl.exe",
+                    "-d",
+                    name,
+                    "-u",
+                    "root",
+                    "sh",
+                    "-c",
+                    check_cmd,
+                ]
+            )
 
             if "exists" in check_result:
-                self.print(f"Warning: {wsl_ssh_path} exists and is a directory. Skipping symlink to prevent data loss.")
+                self.print(
+                    f"Warning: {wsl_ssh_path} exists and is a directory. Skipping symlink to prevent data loss."
+                )
                 return False
 
             shell_command = f"ln -sf {host_ssh_path} {wsl_ssh_path}"
-            self._run_command([self._get_wsl_binary() or "wsl.exe", "-d", name, "-u", "root", "sh", "-c", shell_command])
+            self._run_command(
+                [
+                    self._get_wsl_binary() or "wsl.exe",
+                    "-d",
+                    name,
+                    "-u",
+                    "root",
+                    "sh",
+                    "-c",
+                    shell_command,
+                ]
+            )
             return True
         except Exception:
             return False
@@ -223,12 +273,14 @@ class Provider(LocalBaseManager):
         wsl_user = cloud_config.get("wsl_username", "root")
 
         try:
-            result = self._run_command([self._get_wsl_binary(), "-d", name, "-u", wsl_user, "sh", "-c", cmd])
+            result = self._run_command(
+                [self._get_wsl_binary(), "-d", name, "-u", wsl_user, "sh", "-c", cmd]
+            )
             return result.stdout
         except Exception as e:
             return f"Error executing command: {e}"
 
-    def info(self, name: str, kind: str = "vm") -> Dict[str, Any]:
+    def info(self, name: str, kind: str = "vm") -> dict[str, Any]:
         """Gets detailed information about a WSL2 distribution."""
         if not name or not self.exists(name):
             raise VMResourceError(f"Distribution {name} not found")
@@ -237,12 +289,16 @@ class Provider(LocalBaseManager):
         vms = self.list()
         for vm in vms:
             if vm["name"] == name:
-                return {"Name": vm["name"], "State": vm["state"], "Version": vm["version"]}
+                return {
+                    "Name": vm["name"],
+                    "State": vm["state"],
+                    "Version": vm["version"],
+                }
 
         raise VMResourceError(f"Distribution {name} not found in list")
 
     @property
-    def version(self) -> List[str]:
+    def version(self) -> builtins.list[str]:
         """
         Returns a list of version strings for the WSL tool.
         """
@@ -263,6 +319,7 @@ class Provider(LocalBaseManager):
         # This allows the provider to be detected even when running from inside WSL.
         binary = self._get_wsl_binary()
         import shutil
+
         return shutil.which(binary) is not None
 
     def _get_current_status(self, name: str) -> str:
@@ -271,7 +328,7 @@ class Provider(LocalBaseManager):
         vm = next((v for v in vms if v["name"] == name), None)
         return vm["state"] if vm else ""
 
-    def validate_config(self) -> Dict[str, List[str]]:
+    def validate_config(self) -> dict[str, builtins.list[str]]:
         """
         Validates WSL2 configuration.
         """
@@ -288,14 +345,15 @@ class Provider(LocalBaseManager):
 
         return errors_map
 
-    def get_provider_info(self) -> Dict[str, Any]:
+    def get_provider_info(self) -> dict[str, Any]:
         """Gets detailed information about the WSL2 provider."""
         return {
             "provider": "WSL2",
             "cloud_name": self.cloud_name,
             "version": self.version,
             "config": {
-                "install_dir": self.get_cloud_config("wsl2").get("install_dir", "C:\\WSL"),
+                "install_dir": self.get_cloud_config("wsl2").get(
+                    "install_dir", "C:\\WSL"
+                ),
             },
         }
-

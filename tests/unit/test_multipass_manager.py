@@ -1,8 +1,11 @@
-import pytest
 import re
 from unittest.mock import MagicMock
+
+import pytest
+
+from cloudmesh.ai.vm.exceptions import ProviderFeatureNotSupported, VMResourceError
 from cloudmesh.ai.vm.local.MultipassManager import Provider
-from cloudmesh.ai.vm.exceptions import VMResourceError, ProviderFeatureNotSupported
+
 
 @pytest.fixture
 def mock_config():
@@ -12,10 +15,11 @@ def mock_config():
                 "image": "22.04",
                 "cpus": 2,
                 "memory": "4GiB",
-                "disk": "20GiB"
+                "disk": "20GiB",
             }
         }
     }
+
 
 @pytest.fixture
 def provider(mock_config):
@@ -23,17 +27,28 @@ def provider(mock_config):
     p._run_command = MagicMock()
     return p
 
+
 def test_start_with_name_and_config(provider):
     vm_name = "test-vm"
     result = provider.start(name=vm_name)
 
     # Verify the command constructed
-    expected_command = ["multipass", "launch", "-c", "2", "-m", "4GiB", "-d", "20GiB", "-n", vm_name, "22.04"]
-    provider._run_command.assert_any_call(
-        expected_command,
-        stream=True
-    )
+    expected_command = [
+        "multipass",
+        "launch",
+        "-c",
+        "2",
+        "-m",
+        "4GiB",
+        "-d",
+        "20GiB",
+        "-n",
+        vm_name,
+        "22.04",
+    ]
+    provider._run_command.assert_any_call(expected_command, stream=True)
     assert result == vm_name
+
 
 def test_start_without_name(provider):
     # Mock Multipass list output for exists()
@@ -48,16 +63,26 @@ def test_start_without_name(provider):
 
     result = provider.start()
 
-    expected_command = ["multipass", "launch", "-c", "2", "-m", "4GiB", "-d", "20GiB", "22.04"]
-    provider._run_command.assert_any_call(
-        expected_command,
-        stream=True
-    )
+    expected_command = [
+        "multipass",
+        "launch",
+        "-c",
+        "2",
+        "-m",
+        "4GiB",
+        "-d",
+        "20GiB",
+        "22.04",
+    ]
+    provider._run_command.assert_any_call(expected_command, stream=True)
     assert result != "multipass-generated"
+
 
 def test_stop_success(provider):
     # Mock Multipass list output for exists()
-    mock_list_result = MagicMock(stdout="Name State IPv4 Image\ntest-vm Running 192.168.64.5 Ubuntu 22.04 LTS\n")
+    mock_list_result = MagicMock(
+        stdout="Name State IPv4 Image\ntest-vm Running 192.168.64.5 Ubuntu 22.04 LTS\n"
+    )
 
     def side_effect(command, **kwargs):
         if command == ["multipass", "list", "--format", "json"]:
@@ -68,6 +93,7 @@ def test_stop_success(provider):
 
     assert provider.stop(name="test-vm") is True
     provider._run_command.assert_any_call(["multipass", "stop", "test-vm"])
+
 
 def test_stop_failure(provider):
     # Mock Multipass list output to be empty so exists() returns False
@@ -83,9 +109,12 @@ def test_stop_failure(provider):
     with pytest.raises(VMResourceError):
         provider.stop(name="non-existent")
 
+
 def test_delete_success(provider):
     # Mock Multipass list output for exists()
-    mock_list_result = MagicMock(stdout="Name State IPv4 Image\ntest-vm Running 192.168.64.5 Ubuntu 22.04 LTS\n")
+    mock_list_result = MagicMock(
+        stdout="Name State IPv4 Image\ntest-vm Running 192.168.64.5 Ubuntu 22.04 LTS\n"
+    )
 
     def side_effect(command, **kwargs):
         if command == ["multipass", "list", "--format", "json"]:
@@ -96,6 +125,7 @@ def test_delete_success(provider):
 
     assert provider.delete(name="test-vm") is True
     provider._run_command.assert_any_call(["multipass", "delete", "--purge", "test-vm"])
+
 
 def test_list_parsing(provider):
     # Mock Multipass output
@@ -114,9 +144,12 @@ def test_list_parsing(provider):
     assert vms[1]["name"] == "vm-2"
     assert vms[1]["status"] == "Stopped"
 
+
 def test_restart_success(provider):
     # Mock Multipass list output for exists()
-    mock_list_result = MagicMock(stdout="Name State IPv4 Image\ntest-vm Running 192.168.64.5 Ubuntu 22.04 LTS\n")
+    mock_list_result = MagicMock(
+        stdout="Name State IPv4 Image\ntest-vm Running 192.168.64.5 Ubuntu 22.04 LTS\n"
+    )
 
     def side_effect(command, **kwargs):
         if command == ["multipass", "list", "--format", "json"]:
@@ -128,6 +161,7 @@ def test_restart_success(provider):
     assert provider.restart(name="test-vm") is True
     provider._run_command.assert_any_call(["multipass", "stop", "test-vm"])
     provider._run_command.assert_any_call(["multipass", "start", "test-vm"])
+
 
 def test_getters(provider):
     # Test flavor getter
@@ -144,6 +178,7 @@ def test_getters(provider):
     # Test security groups getter
     with pytest.raises(ProviderFeatureNotSupported):
         provider.get_security_groups()
+
 
 def test_upload_key_escaping(provider, tmp_path):
     # Create a dummy public key file with a single quote
@@ -162,9 +197,10 @@ def test_upload_key_escaping(provider, tmp_path):
     escaped_name = key_name.replace("'", "'\\''")
     expected_cmd_part = f"mkdir -p ~/.ssh && chmod 700 ~/.ssh && printf '%s\\n' '{escaped_key} # {escaped_name}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
 
-    provider._run_command.assert_called_with([
-        "multipass", "exec", vm_name, "--", "bash", "-c", expected_cmd_part
-    ])
+    provider._run_command.assert_called_with(
+        ["multipass", "exec", vm_name, "--", "bash", "-c", expected_cmd_part]
+    )
+
 
 def test_delete_key_escaping(provider):
     key_name = "my/key'name"
@@ -177,10 +213,15 @@ def test_delete_key_escaping(provider):
     # 2. key_name is passed as a positional argument to bash -c
     escaped_key_name = re.escape(key_name).replace("/", r"\/")
     expected_cmd = [
-        "multipass", "exec", vm_name, "--", "bash", "-c",
-        "sed -i \"/$1/d\" ~/.ssh/authorized_keys",
+        "multipass",
+        "exec",
+        vm_name,
+        "--",
         "bash",
-        escaped_key_name
+        "-c",
+        'sed -i "/$1/d" ~/.ssh/authorized_keys',
+        "bash",
+        escaped_key_name,
     ]
 
     provider._run_command.assert_called_with(expected_cmd)

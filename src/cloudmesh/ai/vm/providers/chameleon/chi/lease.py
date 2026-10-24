@@ -5,7 +5,7 @@ import os
 import re
 import time
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING
 
 import pandas
 from blazarclient.exception import BlazarClientException
@@ -24,7 +24,7 @@ from .network import PUBLIC_NETWORK, get_network_id, list_floating_ips
 from .util import retry_create, utcnow
 
 if TYPE_CHECKING:
-    from typing import Pattern
+    from re import Pattern
 
 
 LOG = logging.getLogger(__name__)
@@ -181,11 +181,11 @@ class Lease:
 
     def __init__(
         self,
-        name: Optional[str] = None,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        duration: Optional[timedelta] = None,
-        lease_json: Optional[dict] = None,
+        name: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        duration: timedelta | None = None,
+        lease_json: dict | None = None,
     ):
         self.id = None
         self.status = None
@@ -397,7 +397,7 @@ class Lease:
         machine_type: str = None,
         device_model: str = None,
         device_name: str = None,
-        devices: List[Device] = None,
+        devices: list[Device] = None,
     ):
         """
         Add a IoT device reservation to the list of device reservations.
@@ -436,7 +436,7 @@ class Lease:
         amount: int = None,
         node_type: str = None,
         node_name: str = None,
-        nodes: List[Node] = None,
+        nodes: list[Node] = None,
     ):
         """
         Add a node reservation to the lease.
@@ -532,7 +532,7 @@ class Lease:
         self,
         wait_for_active: bool = True,
         wait_timeout: int = 300,
-        show: Optional[str] = None,
+        show: str | None = None,
         idempotent: bool = False,
         retry_on_error: bool = False,
     ):
@@ -1200,7 +1200,7 @@ def lease_duration(days=1, hours=0, td=None):
 #########
 
 
-def list_leases() -> List[Lease]:
+def list_leases() -> list[Lease]:
     """
     Return a list of user leases.
 
@@ -1373,7 +1373,7 @@ def _get_lease_from_blazar(ref: str):
             raise
 
 
-def get_lease(ref: str) -> Union[Lease, None]:
+def get_lease(ref: str) -> Lease | None:
     """
     Get a lease by its ID or name.
 
@@ -1455,7 +1455,7 @@ def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
             events=[],
         )
     except BlazarClientException as ex:
-        msg: "str" = ex.args[0]
+        msg: str = ex.args[0]
         msg = msg.lower()
 
         match = ErrorParsers.NOT_ENOUGH_RESOURCES.match(msg)

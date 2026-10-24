@@ -85,6 +85,7 @@ def main():
 
     # Suppress insecure SSL warnings for probing
     import urllib3
+
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     session = conn.session
@@ -94,7 +95,9 @@ def main():
     if not catalog:
         sys.exit(f"❌ No service catalog returned for cloud '{args.cloud}'.")
 
-    print(f"📋 Found {len(catalog)} services in the Keystone catalog for '{args.cloud}'. Probing endpoints...\n")
+    print(
+        f"📋 Found {len(catalog)} services in the Keystone catalog for '{args.cloud}'. Probing endpoints...\n"
+    )
 
     results = []
 
@@ -114,16 +117,22 @@ def main():
             endpoint_url = all_eps[0] if all_eps else "N/A"
 
         if endpoint_url == "N/A":
-            probe = {"status": "NO_ENDPOINT", "message": "No endpoint URL defined", "ok": False}
+            probe = {
+                "status": "NO_ENDPOINT",
+                "message": "No endpoint URL defined",
+                "ok": False,
+            }
         else:
             probe = probe_endpoint(endpoint_url, timeout=args.timeout)
 
-        results.append({
-            "type": srv_type,
-            "name": srv_name,
-            "url": endpoint_url,
-            "probe": probe,
-        })
+        results.append(
+            {
+                "type": srv_type,
+                "name": srv_name,
+                "url": endpoint_url,
+                "probe": probe,
+            }
+        )
 
     # Print summary table
     col_type = 20
@@ -141,22 +150,30 @@ def main():
         probe = item["probe"]
         icon = "✅" if probe["ok"] else "❌"
         status_text = f"{icon} {probe['status']}"
-        print(f"{item['type']:<{col_type}} {item['name']:<{col_name}} {status_text:<{col_status}} {item['url']}")
+        print(
+            f"{item['type']:<{col_type}} {item['name']:<{col_name}} {status_text:<{col_status}} {item['url']}"
+        )
 
     print(separator)
 
     # Highlight Heat / Orchestration specifically
-    heat_item = next((r for r in results if "orchestrat" in r["type"] or "heat" in r["name"]), None)
+    heat_item = next(
+        (r for r in results if "orchestrat" in r["type"] or "heat" in r["name"]), None
+    )
     if heat_item:
         print("\n🔥 Heat Orchestration Status:")
         if heat_item["probe"]["ok"]:
             print(f"   ✅ Heat is ACTIVE and responding at {heat_item['url']}.")
         else:
-            print(f"   ❌ Heat is REGISTERED in Keystone, but the endpoint is NOT RESPONDING.")
+            print(
+                "   ❌ Heat is REGISTERED in Keystone, but the endpoint is NOT RESPONDING."
+            )
             print(f"      Detail: {heat_item['probe']['message']}")
             print(f"      Conclusion: Heat is disabled / down on '{args.cloud}'.")
     else:
-        print(f"\n🔥 Heat Orchestration is NOT registered in the service catalog for '{args.cloud}'.")
+        print(
+            f"\n🔥 Heat Orchestration is NOT registered in the service catalog for '{args.cloud}'."
+        )
 
 
 if __name__ == "__main__":

@@ -1,13 +1,13 @@
-import os
-import subprocess
-import logging
-import json
 import base64
 import hashlib
-from typing import List, Dict, Any, Optional
+import json
+import logging
+import subprocess
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger("cloudmesh.ai.vm")
+
 
 class KeyManager:
     """
@@ -39,7 +39,7 @@ class KeyManager:
             md5_hash = hashlib.md5(key_bytes).hexdigest()
 
             # Format with colons to match standard ssh-keygen output (e.g., ab:cd:ef...)
-            return ":".join(md5_hash[i:i+2] for i in range(0, len(md5_hash), 2))
+            return ":".join(md5_hash[i : i + 2] for i in range(0, len(md5_hash), 2))
 
         except Exception as e:
             logger.debug(f"Error computing MD5 fingerprint: {e}")
@@ -65,7 +65,9 @@ class KeyManager:
             sha256_digest = hashlib.sha256(key_bytes).digest()
 
             # Encode to base64 and strip trailing '=' padding per OpenSSH convention
-            fingerprint_b64 = base64.b64encode(sha256_digest).decode('utf-8').rstrip('=')
+            fingerprint_b64 = (
+                base64.b64encode(sha256_digest).decode("utf-8").rstrip("=")
+            )
 
             return f"SHA256:{fingerprint_b64}"
 
@@ -73,7 +75,7 @@ class KeyManager:
             logger.debug(f"Error computing SHA256 fingerprint: {e}")
             return "N/A"
 
-    def get_fingerprints(self, key_path: str) -> Dict[str, str]:
+    def get_fingerprints(self, key_path: str) -> dict[str, str]:
         """
         Retrieves the SSH fingerprints (both SHA256 and MD5) for a given key.
         """
@@ -84,7 +86,7 @@ class KeyManager:
                 ["ssh-keygen", "-lf", key_path],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             parts_sha = res_sha.stdout.strip().split()
             for p in parts_sha:
@@ -92,15 +94,15 @@ class KeyManager:
                     results["sha256"] = p.split(":", 1)[1]
                     break
                 if len(p) == 43 and p.count("/") == 0 and p[0].isalnum():
-                     results["sha256"] = p
-                     break
+                    results["sha256"] = p
+                    break
 
             # Get MD5 (Classic aa:bb:cc...)
             res_md5 = subprocess.run(
                 ["ssh-keygen", "-E", "md5", "-lf", key_path],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             parts_md5 = res_md5.stdout.strip().split()
             for p in parts_md5:
@@ -115,7 +117,7 @@ class KeyManager:
 
         return results
 
-    def scan_local_keys(self) -> List[Dict[str, Any]]:
+    def scan_local_keys(self) -> list[dict[str, Any]]:
         """
         Scans the ~/.ssh directory for common private keys and checks for passphrases.
         """
@@ -125,7 +127,9 @@ class KeyManager:
             return keys
 
         for file in self.ssh_dir.iterdir():
-            is_common_name = any(file.name.startswith(name) for name in self.COMMON_KEY_NAMES)
+            is_common_name = any(
+                file.name.startswith(name) for name in self.COMMON_KEY_NAMES
+            )
             is_pem = file.suffix == ".pem"
 
             if (is_common_name or is_pem) and file.suffix != ".pub":
@@ -133,14 +137,16 @@ class KeyManager:
                 has_passphrase = self._has_passphrase(file)
                 fps = self.get_fingerprints(str(file))
                 comment = self._get_key_comment(file)
-                keys.append({
-                    "path": str(file),
-                    "type": key_type,
-                    "sha256": fps["sha256"],
-                    "md5": fps["md5"],
-                    "comment": comment,
-                    "has_passphrase": has_passphrase
-                })
+                keys.append(
+                    {
+                        "path": str(file),
+                        "type": key_type,
+                        "sha256": fps["sha256"],
+                        "md5": fps["md5"],
+                        "comment": comment,
+                        "has_passphrase": has_passphrase,
+                    }
+                )
 
         return keys
 
@@ -160,7 +166,7 @@ class KeyManager:
                 ["ssh-keygen", "-y", "-f", str(key_path)],
                 capture_output=True,
                 text=True,
-                stdin=subprocess.DEVNULL
+                stdin=subprocess.DEVNULL,
             )
             if pub_out.returncode == 0:
                 pub_line = pub_out.stdout.strip().splitlines()[0]
@@ -177,31 +183,46 @@ class KeyManager:
         Attempts to determine the key type from the file content or name.
         """
         try:
-            with open(key_path, 'r') as f:
+            with open(key_path, "r") as f:
                 first_line = f.readline().strip()
                 if "OPENSSH PRIVATE KEY" in first_line:
-                    if "ed25519" in key_path.name: return "ed25519"
-                    if "rsa" in key_path.name: return "rsa"
-                    if "ecdsa" in key_path.name: return "ecdsa"
-                    if "dsa" in key_path.name: return "dsa"
+                    if "ed25519" in key_path.name:
+                        return "ed25519"
+                    if "rsa" in key_path.name:
+                        return "rsa"
+                    if "ecdsa" in key_path.name:
+                        return "ecdsa"
+                    if "dsa" in key_path.name:
+                        return "dsa"
                     return "openssh"
-                if "RSA PRIVATE KEY" in first_line: return "rsa"
-                if "DSA PRIVATE KEY" in first_line: return "dsa"
-                if "EC PRIVATE KEY" in first_line: return "ecdsa"
+                if "RSA PRIVATE KEY" in first_line:
+                    return "rsa"
+                if "DSA PRIVATE KEY" in first_line:
+                    return "dsa"
+                if "EC PRIVATE KEY" in first_line:
+                    return "ecdsa"
                 if "PRIVATE KEY" in first_line:
-                    if "ed25519" in key_path.name: return "ed25519"
-                    if "rsa" in key_path.name: return "rsa"
-                    if "ecdsa" in key_path.name: return "ecdsa"
-                    if "dsa" in key_path.name: return "dsa"
+                    if "ed25519" in key_path.name:
+                        return "ed25519"
+                    if "rsa" in key_path.name:
+                        return "rsa"
+                    if "ecdsa" in key_path.name:
+                        return "ecdsa"
+                    if "dsa" in key_path.name:
+                        return "dsa"
                     return "pkcs8"
         except Exception:
             pass
 
         name = key_path.name.lower()
-        if "ed25519" in name: return "ed25519"
-        if "rsa" in name: return "rsa"
-        if "ecdsa" in name: return "ecdsa"
-        if "dsa" in name: return "dsa"
+        if "ed25519" in name:
+            return "ed25519"
+        if "rsa" in name:
+            return "rsa"
+        if "ecdsa" in name:
+            return "ecdsa"
+        if "dsa" in name:
+            return "dsa"
         return "unknown"
 
     def _has_passphrase(self, key_path: Path) -> bool:
@@ -214,7 +235,7 @@ class KeyManager:
                 capture_output=True,
                 text=True,
                 timeout=5,
-                stdin=subprocess.DEVNULL
+                stdin=subprocess.DEVNULL,
             )
             if result.returncode != 0:
                 return True
@@ -223,23 +244,20 @@ class KeyManager:
             logger.debug(f"Error checking passphrase for {key_path}: {e}")
             return False
 
-    def get_github_keys(self) -> List[Dict[str, Any]]:
+    def get_github_keys(self) -> list[dict[str, Any]]:
         """
         Fetches the list of SSH keys from GitHub using the API.
         """
         try:
             result = subprocess.run(
-                ["gh", "api", "user/keys"],
-                capture_output=True,
-                text=True,
-                check=True
+                ["gh", "api", "user/keys"], capture_output=True, text=True, check=True
             )
             return json.loads(result.stdout)
         except Exception as e:
             logger.error(f"Failed to fetch GitHub keys via API: {e}")
             return []
 
-    def verify_github_auth(self, key_path: str) -> Dict[str, Any]:
+    def verify_github_auth(self, key_path: str) -> dict[str, Any]:
         """
         Verifies if a specific SSH key authenticates successfully with GitHub.
         """
@@ -256,7 +274,7 @@ class KeyManager:
                         "title": gk.get("title"),
                         "fingerprint": gk.get("fingerprint") or local_sha256,
                         "created_at": gk.get("created_at", "N/A"),
-                        "last_used": gk.get("last_used", "N/A")
+                        "last_used": gk.get("last_used", "N/A"),
                     }
 
             # 2. Match by public key content
@@ -273,7 +291,7 @@ class KeyManager:
                     ["ssh-keygen", "-y", "-f", key_path],
                     capture_output=True,
                     text=True,
-                    stdin=subprocess.DEVNULL
+                    stdin=subprocess.DEVNULL,
                 )
                 local_pub = pub_out.stdout.strip()
 
@@ -289,31 +307,54 @@ class KeyManager:
                             "title": gk.get("title"),
                             "fingerprint": gk.get("fingerprint") or local_sha256,
                             "created_at": gk.get("created_at", "N/A"),
-                            "last_used": gk.get("last_used", "N/A")
+                            "last_used": gk.get("last_used", "N/A"),
                         }
 
             # 3. Fallback to live connection check
             result = subprocess.run(
-                ["ssh", "-i", key_path, "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "git@github.com"],
+                [
+                    "ssh",
+                    "-i",
+                    key_path,
+                    "-o",
+                    "BatchMode=yes",
+                    "-o",
+                    "ConnectTimeout=5",
+                    "git@github.com",
+                ],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
             )
             if result.returncode == 0 or "Hi" in result.stdout or "Hi" in result.stderr:
                 return {
                     "authenticated": True,
                     "title": "Unknown (Live Auth)",
-                    "fingerprint": local_sha256 if local_sha256 != "unknown" else fps["md5"],
+                    "fingerprint": local_sha256
+                    if local_sha256 != "unknown"
+                    else fps["md5"],
                     "created_at": "N/A",
-                    "last_used": "N/A"
+                    "last_used": "N/A",
                 }
 
-            return {"authenticated": False, "title": None, "fingerprint": None, "created_at": "N/A", "last_used": "N/A"}
+            return {
+                "authenticated": False,
+                "title": None,
+                "fingerprint": None,
+                "created_at": "N/A",
+                "last_used": "N/A",
+            }
         except Exception as e:
             logger.debug(f"Error verifying GitHub auth for {key_path}: {e}")
-            return {"authenticated": False, "title": None, "fingerprint": None, "created_at": "N/A", "last_used": "N/A"}
+            return {
+                "authenticated": False,
+                "title": None,
+                "fingerprint": None,
+                "created_at": "N/A",
+                "last_used": "N/A",
+            }
 
-    def github_upload(self, key_path: str) -> Dict[str, Any]:
+    def github_upload(self, key_path: str) -> dict[str, Any]:
         """
         Uploads a local SSH key to GitHub using the gh CLI.
         """
@@ -325,27 +366,33 @@ class KeyManager:
                     ["ssh-keygen", "-y", "-f", str(private_key_path)],
                     capture_output=True,
                     text=True,
-                    check=True
+                    check=True,
                 )
                 with open(public_key_path, "w") as f:
                     f.write(pub_out.stdout)
             except subprocess.CalledProcessError as e:
-                return {"success": False, "error": f"Could not generate public key: {e.stderr}"}
+                return {
+                    "success": False,
+                    "error": f"Could not generate public key: {e.stderr}",
+                }
 
         try:
             result = subprocess.run(
                 ["gh", "ssh-key", "add", str(public_key_path)],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             return {"success": True, "output": result.stdout}
         except subprocess.CalledProcessError as e:
             return {"success": False, "error": e.stderr or e.stdout}
         except FileNotFoundError:
-            return {"success": False, "error": "GitHub CLI ('gh') not found. Please install it."}
+            return {
+                "success": False,
+                "error": "GitHub CLI ('gh') not found. Please install it.",
+            }
 
-    def find_key_path(self, public_key: str) -> Optional[str]:
+    def find_key_path(self, public_key: str) -> str | None:
         """
         Attempts to find a local private key that matches the given public key material.
         """
@@ -371,7 +418,9 @@ class KeyManager:
             if file.suffix == ".pub":
                 continue
 
-            is_common_name = any(file.name.startswith(name) for name in self.COMMON_KEY_NAMES)
+            is_common_name = any(
+                file.name.startswith(name) for name in self.COMMON_KEY_NAMES
+            )
             is_pem = file.suffix == ".pem"
             if not (is_common_name or is_pem):
                 continue
@@ -381,7 +430,7 @@ class KeyManager:
                     ["ssh-keygen", "-y", "-f", str(file)],
                     capture_output=True,
                     text=True,
-                    stdin=subprocess.DEVNULL
+                    stdin=subprocess.DEVNULL,
                 )
                 if pub_out.returncode == 0:
                     generated_pub = pub_out.stdout.strip()
@@ -392,7 +441,7 @@ class KeyManager:
 
         return None
 
-    def github_list(self) -> List[Dict[str, Any]]:
+    def github_list(self) -> list[dict[str, Any]]:
         """
         Lists the SSH keys currently configured in GitHub and identifies their local paths.
         """
@@ -408,7 +457,9 @@ class KeyManager:
 
             # Check if the local key has a passphrase
             if path_result:
-                k["passkey"] = "Yes" if self._has_passphrase(Path(path_result)) else "No"
+                k["passkey"] = (
+                    "Yes" if self._has_passphrase(Path(path_result)) else "No"
+                )
             else:
                 k["passkey"] = "N/A"
 

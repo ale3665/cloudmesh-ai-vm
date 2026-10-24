@@ -1,22 +1,34 @@
-import pytest
-from typing import Dict, Any
 from unittest.mock import MagicMock, patch
-from cloudmesh.ai.vm.providers import PROVIDER_MAP
+
+import pytest
+
 from cloudmesh.ai.vm.exceptions import ProviderFeatureNotSupported
+from cloudmesh.ai.vm.providers import PROVIDER_MAP
 
 # Mock configuration that should work for all providers
 MOCK_CONFIG = {
     "clouds": {
         "aws": {"access_key": "test", "secret_key": "test", "region": "us-east-1"},
-        "azure": {"tenant_id": "test", "subscription_id": "test", "client_id": "test", "client_secret": "test"},
+        "azure": {
+            "tenant_id": "test",
+            "subscription_id": "test",
+            "client_id": "test",
+            "client_secret": "test",
+        },
         "google": {"project_id": "test", "private_key": "test"},
-        "openstack": {"image": "test", "flavor": "test", "auth_url": "test", "region_name": "test"},
+        "openstack": {
+            "image": "test",
+            "flavor": "test",
+            "auth_url": "test",
+            "region_name": "test",
+        },
         "multipass": {"image": "22.04"},
         "wsl2": {"rootfs": "/tmp/rootfs"},
         "lima": {"template": "ubuntu"},
         "vbox": {},
     }
 }
+
 
 def get_mock_provider(cloud_name: str):
     """Helper to create a mocked instance of a VM provider."""
@@ -31,6 +43,7 @@ def get_mock_provider(cloud_name: str):
     # Since we need the provider to hold the mock, we can't easily use a simple context manager here.
     # Instead, we return the provider and the user handles the patching, or we patch the class.
     return provider_cls(config=MOCK_CONFIG, cloud_name=cloud_name)
+
 
 @pytest.mark.parametrize("cloud_name", PROVIDER_MAP.keys())
 def test_provider_core_workflow(cloud_name):
@@ -52,11 +65,16 @@ def test_provider_core_workflow(cloud_name):
 
         # Mock local CLI commands
         if hasattr(provider, "_run_command"):
-            with patch.object(provider, "_run_command", return_value=MagicMock(stdout="success", returncode=0)):
+            with patch.object(
+                provider,
+                "_run_command",
+                return_value=MagicMock(stdout="success", returncode=0),
+            ):
                 # Execute the test logic
                 _run_core_logic(provider)
         else:
             _run_core_logic(provider)
+
 
 def _run_core_logic(provider):
     # 1. Initialization & Config
@@ -71,7 +89,9 @@ def _run_core_logic(provider):
     with patch.object(provider, "exists", return_value=True):
         assert provider.exists(vm_id) is True
 
-    with patch.object(provider, "info", return_value={"name": vm_id, "status": "running"}):
+    with patch.object(
+        provider, "info", return_value={"name": vm_id, "status": "running"}
+    ):
         info = provider.info(vm_id)
         assert info["name"] == vm_id
         assert info["status"] == "running"
@@ -82,13 +102,16 @@ def _run_core_logic(provider):
     with patch.object(provider, "delete", return_value=True):
         assert provider.delete(vm_id) is True
 
+
 @pytest.mark.parametrize("cloud_name", PROVIDER_MAP.keys())
 def test_provider_discovery_and_metadata(cloud_name):
     """
     Verify that list(), get_provider_info(), and basic discovery work.
     """
     provider_cls = PROVIDER_MAP.get(cloud_name)
-    with patch("subprocess.run", return_value=MagicMock(stdout="success", returncode=0)):
+    with patch(
+        "subprocess.run", return_value=MagicMock(stdout="success", returncode=0)
+    ):
         if hasattr(provider_cls, "_get_driver"):
             with patch.object(provider_cls, "_get_driver", return_value=MagicMock()):
                 provider = provider_cls(config=MOCK_CONFIG, cloud_name=cloud_name)
@@ -96,10 +119,15 @@ def test_provider_discovery_and_metadata(cloud_name):
             provider = provider_cls(config=MOCK_CONFIG, cloud_name=cloud_name)
 
         if hasattr(provider, "_run_command"):
-            with patch.object(provider, "_run_command", return_value=MagicMock(stdout="success", returncode=0)):
+            with patch.object(
+                provider,
+                "_run_command",
+                return_value=MagicMock(stdout="success", returncode=0),
+            ):
                 _run_discovery_logic(provider, cloud_name)
         else:
             _run_discovery_logic(provider, cloud_name)
+
 
 def _run_discovery_logic(provider, cloud_name):
     # 1. Metadata
@@ -109,11 +137,14 @@ def _run_discovery_logic(provider, cloud_name):
     assert info["cloud_name"] == cloud_name
 
     # 2. Inventory
-    with patch.object(provider, "list", return_value=[{"name": "test-vm", "status": "running"}]):
+    with patch.object(
+        provider, "list", return_value=[{"name": "test-vm", "status": "running"}]
+    ):
         vms = provider.list()
         assert len(vms) == 1
         assert vms[0]["name"] == "test-vm"
         assert "name" in vms[0]
+
 
 @pytest.mark.parametrize("cloud_name", PROVIDER_MAP.keys())
 def test_provider_access_interface(cloud_name):
@@ -121,7 +152,9 @@ def test_provider_access_interface(cloud_name):
     Verify that the access methods (login, run_command) exist and follow the contract.
     """
     provider_cls = PROVIDER_MAP.get(cloud_name)
-    with patch("subprocess.run", return_value=MagicMock(stdout="success", returncode=0)):
+    with patch(
+        "subprocess.run", return_value=MagicMock(stdout="success", returncode=0)
+    ):
         if hasattr(provider_cls, "_get_driver"):
             with patch.object(provider_cls, "_get_driver", return_value=MagicMock()):
                 provider = provider_cls(config=MOCK_CONFIG, cloud_name=cloud_name)
@@ -129,10 +162,15 @@ def test_provider_access_interface(cloud_name):
             provider = provider_cls(config=MOCK_CONFIG, cloud_name=cloud_name)
 
         if hasattr(provider, "_run_command"):
-            with patch.object(provider, "_run_command", return_value=MagicMock(stdout="success", returncode=0)):
+            with patch.object(
+                provider,
+                "_run_command",
+                return_value=MagicMock(stdout="success", returncode=0),
+            ):
                 _run_access_logic(provider)
         else:
             _run_access_logic(provider)
+
 
 def _run_access_logic(provider):
     try:

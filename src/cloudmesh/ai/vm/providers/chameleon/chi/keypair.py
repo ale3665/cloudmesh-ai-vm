@@ -18,13 +18,13 @@ def ssh_fingerprint(key):
 
 
 def key_pair_name(fingerprint):
-    return "keypair-{}".format(fingerprint)
+    return f"keypair-{fingerprint}"
 
 
-class Keypair(object):
+class Keypair:
     def __init__(self, **kwargs):
 
-        print ("KEYPAIR:", kwargs)
+        print("KEYPAIR:", kwargs)
 
         kwargs.setdefault("session", context.session())
 
@@ -36,7 +36,7 @@ class Keypair(object):
         self.nova = NovaClient("2", session=session)
 
         with open(key_filename) as f:
-            self.key = [line.strip() for line in f.readlines() if line.strip()][0]
+            self.key = [line.strip() for line in f if line.strip()][0]
             fingerprint = ssh_fingerprint(self.key)
             self.key_name = key_pair_name(fingerprint)
 

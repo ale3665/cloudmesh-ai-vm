@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List
 
 import cinderclient
 import manilaclient
@@ -56,7 +55,6 @@ class Share:
         )
         s.id = share.id
         s.export_locations = share.export_locations
-        pass
 
     def submit(
         self,
@@ -107,7 +105,7 @@ class Share:
         manila().shares.shrink(self.id, new_size)
 
 
-def list_shares() -> List[Share]:
+def list_shares() -> list[Share]:
     """Get a list of all available flavors.
 
     Returns:
@@ -170,7 +168,7 @@ class ObjectBucket:
         # TODO idempotent
         conn.put_container(self.name)
 
-    def list_objects(self) -> List[Object]:
+    def list_objects(self) -> list[Object]:
         conn = swiftclient.Connection(session=session())
         container_info, res_objects = conn.get_container(self.name)
         objects = []
@@ -190,7 +188,7 @@ class ObjectBucket:
         Object(container=self.name, name=object_name).download(file_dest)
 
 
-def list_buckets() -> List[ObjectBucket]:
+def list_buckets() -> list[ObjectBucket]:
     swift_conn = swiftclient.client.Connection(session=session())
     resp_headers, containers = swift_conn.get_account()
 
@@ -272,7 +270,7 @@ class Volume:
         return self._from_cinder_volume(volume)
 
 
-def list_volumes() -> List[Volume]:
+def list_volumes() -> list[Volume]:
     """Get a list of all available volumes.
 
     Returns:

@@ -1,11 +1,12 @@
+import getpass
 import inspect
 import json
-import os
-import getpass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
+
 from cloudmesh.ai.vm.base import BaseVMProvider
 from cloudmesh.ai.vm.exceptions import ProviderFeatureNotSupported
+
 
 class MatrixTestBase:
     """
@@ -15,18 +16,41 @@ class MatrixTestBase:
 
     # Master list of capabilities from BaseVMProvider
     CAPABILITIES = [
-        "start", "stop", "restart", "reset", "suspend", "delete",
-        "login", "run_command", "shelve", "unshelve",
-        "list", "info", "get_images", "get_flavors", "get_provider_info", "wait_for_status",
-        "get_keys", "upload_key", "delete_key",
-        "get_security_groups", "get_security_group_info", "create_security_group",
-        "delete_security_group", "add_security_group_to_vm", "remove_security_group_from_vm",
-        "add_security_group_rule", "remove_security_group_rule", "list_security_group_rules",
-        "list_regions", "assign_floating_ip", "release_floating_ip",
-        "get_cost"
+        "start",
+        "stop",
+        "restart",
+        "reset",
+        "suspend",
+        "delete",
+        "login",
+        "run_command",
+        "shelve",
+        "unshelve",
+        "list",
+        "info",
+        "get_images",
+        "get_flavors",
+        "get_provider_info",
+        "wait_for_status",
+        "get_keys",
+        "upload_key",
+        "delete_key",
+        "get_security_groups",
+        "get_security_group_info",
+        "create_security_group",
+        "delete_security_group",
+        "add_security_group_to_vm",
+        "remove_security_group_from_vm",
+        "add_security_group_rule",
+        "remove_security_group_rule",
+        "list_security_group_rules",
+        "list_regions",
+        "assign_floating_ip",
+        "release_floating_ip",
+        "get_cost",
     ]
 
-    def __init__(self, provider_cls: Type[BaseVMProvider], config: Any):
+    def __init__(self, provider_cls: type[BaseVMProvider], config: Any):
         self.provider_cls = provider_cls
         self.config = config
         self.provider = provider_cls(config)
@@ -65,7 +89,10 @@ class MatrixTestBase:
             sig = inspect.signature(method)
             args = {}
             for param in sig.parameters.values():
-                if param.default is inspect.Parameter.empty and param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+                if (
+                    param.default is inspect.Parameter.empty
+                    and param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD
+                ):
                     if param.name == "name":
                         args["name"] = "probe-vm"
                     elif param.name == "key_path":
@@ -108,7 +135,7 @@ class MatrixTestBase:
                 # If not overridden, it will raise ProviderFeatureNotSupported
                 # We can verify this by calling it.
                 method(**args)
-                return "Implemented" # Should not happen if not overridden
+                return "Implemented"  # Should not happen if not overridden
 
         except ProviderFeatureNotSupported:
             return "NotSupported"
@@ -117,7 +144,7 @@ class MatrixTestBase:
             # If it's a TypeError, it means the method exists and is callable,
             # but we didn't call it correctly. This implies it's implemented.
             return "Implemented"
-        except Exception as e:
+        except Exception:
             # Any other exception suggests the method is implemented but broken
             # for the given mock config.
             return "Broken"
@@ -140,7 +167,7 @@ class MatrixTestBase:
         return False
 
     @staticmethod
-    def save_results(all_results: Dict[str, Dict[str, str]]):
+    def save_results(all_results: dict[str, dict[str, str]]):
         """
         Saves the aggregated results to a JSON file.
         all_results: { "aws": {"start": "Implemented", ...}, "azure": {...} }
@@ -150,7 +177,7 @@ class MatrixTestBase:
                 "ran_by": getpass.getuser(),
                 "date": datetime.now().isoformat(),
             },
-            "results": all_results
+            "results": all_results,
         }
 
         with open("tests/matrix/matrix_results.json", "w") as f:

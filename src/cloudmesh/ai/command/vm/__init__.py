@@ -1,10 +1,18 @@
-import os
-import click
 import importlib
-import shlex
 import logging
+import os
+import shlex
 from typing import Optional
-from cloudmesh.ai.command._shared.context import VMContext, cloud_callback, debug_callback, verbose_callback, console
+
+import click
+
+from cloudmesh.ai.command._shared.context import (
+    VMContext,
+    cloud_callback,
+    console,
+    debug_callback,
+    verbose_callback,
+)
 from cloudmesh.ai.command._shared.providers_utils import register_providers
 
 # Register providers immediately so they are available to all commands
@@ -12,10 +20,28 @@ register_providers()
 
 from cloudmesh.ai.command._shared.utils import load_commands_recursively
 
+
 @click.group()
-@click.option("--cloud", callback=cloud_callback, expose_value=False, help="Override the default cloud provider")
-@click.option("--debug", is_flag=True, callback=debug_callback, expose_value=False, help="Enable debug logging")
-@click.option("--verbose", is_flag=True, callback=verbose_callback, expose_value=False, help="Print raw subprocess/SSH commands")
+@click.option(
+    "--cloud",
+    callback=cloud_callback,
+    expose_value=False,
+    help="Override the default cloud provider",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    callback=debug_callback,
+    expose_value=False,
+    help="Enable debug logging",
+)
+@click.option(
+    "--verbose",
+    is_flag=True,
+    callback=verbose_callback,
+    expose_value=False,
+    help="Print raw subprocess/SSH commands",
+)
 @click.option("-i", "--interactive", is_flag=True, help="Enter interactive mode")
 @click.pass_context
 def vm_group(ctx: click.Context, interactive: bool = False) -> None:
@@ -33,7 +59,9 @@ def vm_group(ctx: click.Context, interactive: bool = False) -> None:
         console.print(f"Running on cloud: [bold blue]{active_cloud}[/bold blue]")
 
     if interactive:
-        console.print("[bold green]Entering interactive VM shell. Type 'exit' or 'quit' to leave.[/bold green]")
+        console.print(
+            "[bold green]Entering interactive VM shell. Type 'exit' or 'quit' to leave.[/bold green]"
+        )
 
         while True:
             try:
@@ -54,13 +82,16 @@ def vm_group(ctx: click.Context, interactive: bool = False) -> None:
                 if cmd:
                     ctx.invoke(cmd, *cmd_args)
                 else:
-                    console.print(f"[red]Unknown command: {cmd_name}[/red]. Type 'help' for available commands.")
+                    console.print(
+                        f"[red]Unknown command: {cmd_name}[/red]. Type 'help' for available commands."
+                    )
             except KeyboardInterrupt:
                 console.print("\\n[yellow]Use 'exit' to leave the shell.[/yellow]")
             except Exception as e:
-                console.print(f"[bold red]Shell Error:[/bold red] {str(e)}")
+                console.print(f"[bold red]Shell Error:[/bold red] {e!s}")
     else:
         pass
+
 
 # Initialize the dynamic loading
 COMMANDS_DIR = os.path.dirname(__file__)

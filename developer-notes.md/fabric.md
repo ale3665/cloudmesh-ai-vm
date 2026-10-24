@@ -27,8 +27,9 @@ In this example, we will use Fabric to connect to a Multipass VM, install the ne
 from fabric import task
 
 # Configuration: Change this to your VM's IP
-VM_IP = "192.168.64.5" 
+VM_IP = "192.168.64.5"
 VM_USER = "ubuntu"
+
 
 @task
 def deploy(c):
@@ -36,7 +37,7 @@ def deploy(c):
     Provision and start an MkDocs site on the remote VM.
     """
     print(f"🚀 Connecting to {VM_IP}...")
-    
+
     # 1. Install dependencies
     print("📦 Installing Python and Pip...")
     c.sudo("apt-get update -y")
@@ -56,9 +57,10 @@ def deploy(c):
     print("🌐 Starting MkDocs server on port 8000...")
     # Use nohup to keep the process running after the SSH session closes
     c.run("nohup mkdocs serve -a 0.0.0.0:8000 > /dev/null 2>&1 &")
-    
+
     print("\n✅ Deployment Complete!")
     print(f"Visit: http://{VM_IP}:8000")
+
 
 @task
 def status(c):
@@ -68,6 +70,7 @@ def status(c):
         print("✅ MkDocs is running.")
     else:
         print("❌ MkDocs is not running.")
+
 
 @task
 def stop(c):

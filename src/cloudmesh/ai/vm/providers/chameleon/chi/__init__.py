@@ -10,24 +10,24 @@ from .clients import (
     nova,
     zun,
 )
-from .context import get, params, reset, session, set, use_site, use_device_auth
+from .context import get, params, reset, session, set, use_device_auth, use_site
 
 __all__ = [
-    "get",
-    "params",
-    "reset",
-    "session",
-    "set",
-    "use_site",
-    "use_device_auth",
-    "connection",
     "blazar",
     "cinder",
+    "connection",
+    "get",
     "glance",
     "ironic",
     "keystone",
     "manila",
     "neutron",
     "nova",
+    "params",
+    "reset",
+    "session",
+    "set",
+    "use_device_auth",
+    "use_site",
     "zun",
 ]

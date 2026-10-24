@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional
 
 from glanceclient.exc import HTTPBadRequest, NotFound
 from packaging.version import Version
@@ -47,7 +46,7 @@ class Image:
             )
 
 
-def list_images(is_chameleon_supported: Optional[bool] = False) -> List[Image]:
+def list_images(is_chameleon_supported: bool | None = False) -> list[Image]:
     """List all images available at the current site, filtered by support status.
 
     Args:

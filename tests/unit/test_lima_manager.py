@@ -1,17 +1,15 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from cloudmesh.ai.vm.local.LimaManager import Provider
+
 from cloudmesh.ai.vm.exceptions import VMProviderError
+from cloudmesh.ai.vm.local.LimaManager import Provider
+
 
 @pytest.fixture
 def mock_config():
-    return {
-        "clouds": {
-            "lima": {
-                "template": "ubuntu"
-            }
-        }
-    }
+    return {"clouds": {"lima": {"template": "ubuntu"}}}
+
 
 @pytest.fixture
 def provider(mock_config):
@@ -26,6 +24,7 @@ def provider(mock_config):
         provider._run_command = mock_run
         yield provider
 
+
 def test_init_success():
     with patch.object(Provider, "_run_command") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
@@ -33,12 +32,14 @@ def test_init_success():
         p = Provider(config)
         mock_run.assert_called_once_with(["limactl", "--version"])
 
+
 def test_init_failure():
     with patch.object(Provider, "_run_command") as mock_run:
         mock_run.side_effect = Exception("limactl not found")
         config = {"clouds": {}}
         with pytest.raises(VMProviderError, match="limactl not found"):
             Provider(config)
+
 
 def test_start_with_name(provider):
     vm_name = "test-vm"
@@ -49,8 +50,9 @@ def test_start_with_name(provider):
     assert result == vm_name
     provider._run_command.assert_called_with(
         ["limactl", "start", "--name", vm_name, "--tty=false", "template:ubuntu"],
-        stream=True
+        stream=True,
     )
+
 
 def test_start_default_name(provider):
     provider._run_command.return_value = MagicMock(returncode=0, stdout="Started")
@@ -60,13 +62,16 @@ def test_start_default_name(provider):
     assert result == "lima-vm"
     provider._run_command.assert_called_with(
         ["limactl", "start", "--name", "lima-vm", "--tty=false", "template:ubuntu"],
-        stream=True
+        stream=True,
     )
+
 
 def test_stop_success(provider):
     def side_effect(command, **kwargs):
         if command == ["limactl", "list"]:
-            return MagicMock(returncode=0, stdout="NAME STATUS IMAGE\ntest-vm Running ubuntu\n")
+            return MagicMock(
+                returncode=0, stdout="NAME STATUS IMAGE\ntest-vm Running ubuntu\n"
+            )
         return MagicMock(returncode=0, stdout="Stopped")
 
     provider._run_command.side_effect = side_effect
@@ -74,19 +79,22 @@ def test_stop_success(provider):
     assert provider.stop(name="test-vm") is True
     provider._run_command.assert_any_call(["limactl", "stop", "test-vm"])
 
+
 def test_delete_success(provider):
     def side_effect(command, **kwargs):
         if command == ["limactl", "list"]:
-            return MagicMock(returncode=0, stdout="NAME STATUS IMAGE\ntest-vm Running ubuntu\n")
+            return MagicMock(
+                returncode=0, stdout="NAME STATUS IMAGE\ntest-vm Running ubuntu\n"
+            )
         return MagicMock(returncode=0, stdout="Deleted")
 
     provider._run_command.side_effect = side_effect
 
     assert provider.delete(name="test-vm") is True
     provider._run_command.assert_any_call(
-        ["limactl", "delete", "-f", "test-vm"],
-        stream=True
+        ["limactl", "delete", "-f", "test-vm"], stream=True
     )
+
 
 def test_list_parsing(provider):
     mock_output = (
@@ -94,10 +102,7 @@ def test_list_parsing(provider):
         "vm-1              Running   ubuntu\n"
         "vm-2              Stopped   fedora\n"
     )
-    provider._run_command.return_value = MagicMock(
-        stdout=mock_output,
-        returncode=0
-    )
+    provider._run_command.return_value = MagicMock(stdout=mock_output, returncode=0)
 
     vms = provider.list()
 
@@ -107,20 +112,26 @@ def test_list_parsing(provider):
     assert vms[1]["name"] == "vm-2"
     assert vms[1]["status"] == "Stopped"
 
+
 def test_login(provider):
     def side_effect(command, **kwargs):
         if command == ["limactl", "list"]:
-            return MagicMock(returncode=0, stdout="NAME STATUS IMAGE\ntest-vm Running ubuntu\n")
+            return MagicMock(
+                returncode=0, stdout="NAME STATUS IMAGE\ntest-vm Running ubuntu\n"
+            )
         return MagicMock(returncode=0, stdout="Shell")
 
     provider._run_command.side_effect = side_effect
     assert provider.login(name="test-vm") is True
     provider._run_command.assert_any_call(["limactl", "shell", "test-vm"])
 
+
 def test_restart(provider):
     def side_effect(command, **kwargs):
         if command == ["limactl", "list"]:
-            return MagicMock(returncode=0, stdout="NAME STATUS IMAGE\ntest-vm Running ubuntu\n")
+            return MagicMock(
+                returncode=0, stdout="NAME STATUS IMAGE\ntest-vm Running ubuntu\n"
+            )
         return MagicMock(returncode=0, stdout="Success")
 
     provider._run_command.side_effect = side_effect
@@ -128,6 +139,7 @@ def test_restart(provider):
     assert provider.restart(name="test-vm") is True
     provider._run_command.assert_any_call(["limactl", "stop", "test-vm"])
     provider._run_command.assert_any_call(["limactl", "start", "test-vm"])
+
 
 def test_getters(provider):
     flavors = provider.get_flavors()

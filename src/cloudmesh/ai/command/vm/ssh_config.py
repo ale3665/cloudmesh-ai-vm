@@ -1,6 +1,12 @@
 import click
-from cloudmesh.ai.command._shared.context import console, get_active_provider, vm_options
+
+from cloudmesh.ai.command._shared.context import (
+    console,
+    get_active_provider,
+    vm_options,
+)
 from cloudmesh.ai.command._shared.exceptions import handle_errors
+
 
 @click.command()
 @click.pass_context
@@ -17,5 +23,6 @@ def ssh_config(ctx: click.Context, **kwargs):
         console.print(config)
     else:
         console.print("Could not generate SSH config.")
+
 
 cmd = ssh_config

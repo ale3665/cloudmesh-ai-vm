@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
-from datetime import datetime, timedelta, timezone
 import json
-from pathlib import Path
 import subprocess
 import sys
 import time
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import openstack
 
@@ -47,7 +47,9 @@ def create_reservation(
     start_date = (now + timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M")
     end_date = (now + timedelta(hours=duration_hours)).strftime("%Y-%m-%d %H:%M")
 
-    print(f"📅 Creating Blazar reservation '{lease_name}' for {count}x '{node_type}' node(s)...")
+    print(
+        f"📅 Creating Blazar reservation '{lease_name}' for {count}x '{node_type}' node(s)..."
+    )
     print(f"   Window: {start_date} -> {end_date} UTC ({duration_hours}h duration)")
 
     payload = {
@@ -71,7 +73,9 @@ def create_reservation(
         # If physical:host fails (e.g. on virtual KVM), try virtual:instance
         err_msg = resp.text
         if "physical:host" in err_msg or "resource_type" in err_msg.lower():
-            print("   ↳ Host reservation rejected, trying virtual instance reservation...")
+            print(
+                "   ↳ Host reservation rejected, trying virtual instance reservation..."
+            )
             payload["reservations"] = [
                 {
                     "resource_type": "virtual:instance",
@@ -86,7 +90,9 @@ def create_reservation(
                 lease_data = resp2.json().get("lease", {})
                 print(f"✅ Lease requested successfully: ID={lease_data.get('id')}")
                 return lease_data
-        sys.exit(f"❌ Failed to create Blazar reservation: HTTP {resp.status_code} - {resp.text}")
+        sys.exit(
+            f"❌ Failed to create Blazar reservation: HTTP {resp.status_code} - {resp.text}"
+        )
 
     lease_data = resp.json().get("lease", {})
     print(f"✅ Lease requested successfully: ID={lease_data.get('id')}")
@@ -104,7 +110,9 @@ def wait_for_reservation_active(
     Verifies that the lease and individual reservations are ACTIVE.
     Returns (lease_data, reservation_id).
     """
-    print(f"⏳ Waiting for reservation lease '{lease_id}' to become ACTIVE (up to {timeout}s)...")
+    print(
+        f"⏳ Waiting for reservation lease '{lease_id}' to become ACTIVE (up to {timeout}s)..."
+    )
     start_time = time.time()
     last_status = None
 
@@ -122,7 +130,9 @@ def wait_for_reservation_active(
 
         if status == "ACTIVE":
             reservations = lease.get("reservations", [])
-            active_res = [r for r in reservations if r.get("status", "").upper() == "ACTIVE"]
+            active_res = [
+                r for r in reservations if r.get("status", "").upper() == "ACTIVE"
+            ]
             print("✅ Reservation is confirmed ACTIVE!")
             print(f"   Active reservations: {len(active_res)} / {len(reservations)}")
 
@@ -138,14 +148,18 @@ def wait_for_reservation_active(
             return lease, reservation_id
 
         if status in ("ERROR", "FAILED", "TERMINATED"):
-            sys.exit(f"❌ Lease failed with status: {status}. Degraded: {lease.get('degraded')}")
+            sys.exit(
+                f"❌ Lease failed with status: {status}. Degraded: {lease.get('degraded')}"
+            )
 
         time.sleep(5)
 
     sys.exit(f"❌ Timeout waiting for reservation lease '{lease_id}' to become ACTIVE.")
 
 
-def ensure_keypair(conn: openstack.connection.Connection, name: str, pub_key_path: Path) -> str:
+def ensure_keypair(
+    conn: openstack.connection.Connection, name: str, pub_key_path: Path
+) -> str:
     """Ensure keypair exists, creating it from pub_key_path if missing."""
     kp = conn.compute.find_keypair(name)
     if kp:
@@ -169,10 +183,19 @@ def find_image(conn: openstack.connection.Connection, identifier: str):
     if not img:
         # Search for available images
         images = list(conn.compute.images())
-        for fallback in ("CC-Ubuntu22.04", "CC-Ubuntu20.04", "Ubuntu 22.04", "Featured-Ubuntu22"):
-            match = next((i for i in images if fallback.lower() in i.name.lower()), None)
+        for fallback in (
+            "CC-Ubuntu22.04",
+            "CC-Ubuntu20.04",
+            "Ubuntu 22.04",
+            "Featured-Ubuntu22",
+        ):
+            match = next(
+                (i for i in images if fallback.lower() in i.name.lower()), None
+            )
             if match:
-                print(f"⚠️  Image '{identifier}' not found. Using fallback image: {match.name}")
+                print(
+                    f"⚠️  Image '{identifier}' not found. Using fallback image: {match.name}"
+                )
                 return match
         sys.exit(f"❌ Image '{identifier}' not found.")
     return img
@@ -186,7 +209,9 @@ def find_flavor(conn: openstack.connection.Connection, identifier: str):
         for fallback in ("m1.small", "m1.medium", "baremetal"):
             match = next((f for f in flavors if f.name == fallback), None)
             if match:
-                print(f"⚠️  Flavor '{identifier}' not found. Using fallback flavor: {match.name}")
+                print(
+                    f"⚠️  Flavor '{identifier}' not found. Using fallback flavor: {match.name}"
+                )
                 return match
         sys.exit(f"❌ Flavor '{identifier}' not found.")
     return flavor
@@ -203,7 +228,9 @@ def find_network(conn: openstack.connection.Connection, identifier: str):
                 print(f"⚠️  Network '{identifier}' not found. Using '{match.name}'")
                 return match
         if networks:
-            first_net = next((n for n in networks if not n.is_router_external), networks[0])
+            first_net = next(
+                (n for n in networks if not n.is_router_external), networks[0]
+            )
             print(f"⚠️  Network '{identifier}' not found. Using '{first_net.name}'")
             return first_net
         sys.exit(f"❌ Network '{identifier}' not found.")
@@ -217,7 +244,9 @@ def find_security_group(conn: openstack.connection.Connection, identifier: str):
     return sg
 
 
-def allocate_floating_ip(conn: openstack.connection.Connection, external_network_name: str = "public"):
+def allocate_floating_ip(
+    conn: openstack.connection.Connection, external_network_name: str = "public"
+):
     print(f"🌐 Allocating floating IP from '{external_network_name}'...")
     ext_net = conn.network.find_network(external_network_name)
     if not ext_net:
@@ -256,7 +285,9 @@ def create_server(
     }
 
     if reservation_id:
-        print(f"📌 Passing active reservation ID '{reservation_id}' in scheduler_hints.")
+        print(
+            f"📌 Passing active reservation ID '{reservation_id}' in scheduler_hints."
+        )
         kwargs["scheduler_hints"] = {"reservation": reservation_id}
 
     server = conn.compute.create_server(**kwargs)
@@ -284,7 +315,13 @@ def attach_floating_ip(conn: openstack.connection.Connection, server, fip):
     print("✅ Floating IP attached.")
 
 
-def test_ssh_connection(user: str, ip: str, priv_key_path: Path, command: str = "uname -a", timeout: int = 120) -> bool:
+def test_ssh_connection(
+    user: str,
+    ip: str,
+    priv_key_path: Path,
+    command: str = "uname -a",
+    timeout: int = 120,
+) -> bool:
     """Wait for SSH to become ready and execute a remote command."""
     print(f"\n🔐 Testing SSH login and running '{command}' on {user}@{ip}...")
     if not priv_key_path.is_file():
@@ -293,11 +330,16 @@ def test_ssh_connection(user: str, ip: str, priv_key_path: Path, command: str = 
 
     ssh_cmd = [
         "ssh",
-        "-i", str(priv_key_path),
-        "-o", "StrictHostKeyChecking=no",
-        "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "ConnectTimeout=5",
-        "-o", "BatchMode=yes",
+        "-i",
+        str(priv_key_path),
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "ConnectTimeout=5",
+        "-o",
+        "BatchMode=yes",
         f"{user}@{ip}",
         command,
     ]
@@ -328,22 +370,62 @@ def parse_args():
         help="Cloud entry in clouds.yaml (default: 'chameleon' for KVM@TACC)",
     )
     parser.add_argument("--name", default="my-chameleon-vm", help="Name for the new VM")
-    parser.add_argument("--lease-name", default="gregor-test-lease", help="Name for the Blazar lease")
-    parser.add_argument("--duration", type=int, default=1, help="Reservation duration in hours (default: 1)")
-    parser.add_argument("--node-type", default="compute_haswell", help="Node type for reservation (default: compute_haswell)")
-    parser.add_argument("--skip-reservation", action="store_true", help="Skip creating a Blazar reservation")
+    parser.add_argument(
+        "--lease-name", default="gregor-test-lease", help="Name for the Blazar lease"
+    )
+    parser.add_argument(
+        "--duration",
+        type=int,
+        default=1,
+        help="Reservation duration in hours (default: 1)",
+    )
+    parser.add_argument(
+        "--node-type",
+        default="compute_haswell",
+        help="Node type for reservation (default: compute_haswell)",
+    )
+    parser.add_argument(
+        "--skip-reservation",
+        action="store_true",
+        help="Skip creating a Blazar reservation",
+    )
     parser.add_argument("--image", default="CC-Ubuntu22.04", help="Image name or ID")
     parser.add_argument("--flavor", default="m1.small", help="Flavor name or ID")
     parser.add_argument("--network", default="sharednet1", help="Network name or ID")
     parser.add_argument("--secgroup", default="default", help="Security group name/ID")
-    parser.add_argument("--keypair", default="gregor-tmp-key", help="Keypair name to create/use")
-    parser.add_argument("--keyfile", default=str(Path.home() / ".ssh/id_rsa.pub"), help="Public SSH key path")
-    parser.add_argument("--privkey", default=str(Path.home() / ".ssh/id_rsa"), help="Private SSH key path")
-    parser.add_argument("--command", default="uname -a", help="Command to run on the VM via SSH")
-    parser.add_argument("--ssh-timeout", type=int, default=120, help="Seconds to wait for SSH to become ready")
-    parser.add_argument("--user", default="cc", help="Default SSH user for Chameleon OS image (default: cc)")
-    parser.add_argument("--ext-net", default="public", help="External network for floating IPs")
-    parser.add_argument("--wait", type=int, default=600, help="Seconds to wait for VM ACTIVE state")
+    parser.add_argument(
+        "--keypair", default="gregor-tmp-key", help="Keypair name to create/use"
+    )
+    parser.add_argument(
+        "--keyfile",
+        default=str(Path.home() / ".ssh/id_rsa.pub"),
+        help="Public SSH key path",
+    )
+    parser.add_argument(
+        "--privkey",
+        default=str(Path.home() / ".ssh/id_rsa"),
+        help="Private SSH key path",
+    )
+    parser.add_argument(
+        "--command", default="uname -a", help="Command to run on the VM via SSH"
+    )
+    parser.add_argument(
+        "--ssh-timeout",
+        type=int,
+        default=120,
+        help="Seconds to wait for SSH to become ready",
+    )
+    parser.add_argument(
+        "--user",
+        default="cc",
+        help="Default SSH user for Chameleon OS image (default: cc)",
+    )
+    parser.add_argument(
+        "--ext-net", default="public", help="External network for floating IPs"
+    )
+    parser.add_argument(
+        "--wait", type=int, default=600, help="Seconds to wait for VM ACTIVE state"
+    )
     return parser.parse_args()
 
 
@@ -380,8 +462,12 @@ def main():
                 timeout=300,
             )
         else:
-            print("ℹ️  Blazar reservation service is not registered in Keystone for this site.")
-            print("   Proceeding with direct on-demand VM launch (standard for KVM@TACC).")
+            print(
+                "ℹ️  Blazar reservation service is not registered in Keystone for this site."
+            )
+            print(
+                "   Proceeding with direct on-demand VM launch (standard for KVM@TACC)."
+            )
     else:
         print("⏭️  Skipping reservation step as requested (--skip-reservation).")
 
@@ -434,7 +520,9 @@ def main():
     print(f"   openstack server delete {server.id}")
     print(f"   openstack floating ip delete {fip.id}")
     if lease_id and blazar_url:
-        print(f"   curl -X DELETE {blazar_url}/leases/{lease_id} (or via blazar client)")
+        print(
+            f"   curl -X DELETE {blazar_url}/leases/{lease_id} (or via blazar client)"
+        )
 
 
 if __name__ == "__main__":

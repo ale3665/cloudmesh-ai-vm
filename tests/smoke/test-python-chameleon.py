@@ -1,31 +1,31 @@
 import os
-import yaml
-import pytest
-import uuid
 import subprocess
-import sys
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Callable
-
-
-from cloudmesh.ai.vm.state_manager import StateManager
-from cloudmesh.ai.vm.factory import factory
-from cloudmesh.ai.common.stopwatch import StopWatch
-from cloudmesh.ai.common.dotdict import DotDict
-import yaml
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
 from pprint import pprint
-from cloudmesh.ai.common.util import path_expand
+from typing import Any
+
+import pytest
+import yaml
+from cloudmesh.ai.common.dotdict import DotDict
 from cloudmesh.ai.common.io import banner
-from tests.smoke.benchmark_helper import save_benchmark
+from cloudmesh.ai.common.stopwatch import StopWatch
+from cloudmesh.ai.common.util import path_expand
+
+from cloudmesh.ai.vm.factory import factory
+from cloudmesh.ai.vm.state_manager import StateManager
 
 # Import Providers for registration
 from src.cloudmesh.ai.vm.openstack.ChameleonManager import Provider as ChameleonProvider
-
+from tests.smoke.benchmark_helper import save_benchmark
 
 banner("Loading clouds.yaml configuration for smoke tests")
 
 # Open the file normally, then pass it to yaml.load with the Loader argument
-with open(path_expand("~/.config/cloudmesh/clouds.yaml"), "r", encoding="utf-8") as file:
+with open(
+    path_expand("~/.config/cloudmesh/clouds.yaml"), "r", encoding="utf-8"
+) as file:
     data = yaml.load(file, Loader=yaml.FullLoader)
 
 # Now 'data' is a standard Python dictionary
@@ -35,19 +35,22 @@ config = DotDict(data)
 
 pprint(data)
 
+
 @dataclass
 class ProviderTestConfig:
     name: str
     cloud: str
     provider_class: Any
-    cloud_config: Dict[str, Any]
+    cloud_config: dict[str, Any]
     running_status: str = "Running"
     stopped_status: str = "Stopped"
-    connectivity_strategy: str = "run_command"  # run_command, ssh_execute, multipass_exec
+    connectivity_strategy: str = (
+        "run_command"  # run_command, ssh_execute, multipass_exec
+    )
     has_shelve: bool = False
-    skip_condition: Optional[Callable[[], bool]] = None
+    skip_condition: Callable[[], bool] | None = None
     # Custom hooks for provider-specific verification
-    custom_verify_key: Optional[Callable[[Any, str, str, str], bool]] = None
+    custom_verify_key: Callable[[Any, str, str, str], bool] | None = None
 
 
 PROVIDER_CONFIGS = [
@@ -55,14 +58,16 @@ PROVIDER_CONFIGS = [
         name="chameleon",
         cloud="chameleon",
         provider_class=ChameleonProvider,
-        cloud_config={"image":  config.clouds.chameleon.image, 
-                      "flavor": config.clouds.chameleon.flavor,
-                      "username": config.clouds.chameleon.username, 
-                      "key_name": config.clouds.chameleon.key_name,
-                      "key_path": config.clouds.chameleon.key_path},
+        cloud_config={
+            "image": config.clouds.chameleon.image,
+            "flavor": config.clouds.chameleon.flavor,
+            "username": config.clouds.chameleon.username,
+            "key_name": config.clouds.chameleon.key_name,
+            "key_path": config.clouds.chameleon.key_path,
+        },
         running_status="active",
         stopped_status="stopped",
-        connectivity_strategy="ssh_execute"
+        connectivity_strategy="ssh_execute",
     ),
 ]
 
@@ -76,26 +81,34 @@ banner("Starting Unified Smoke Test for Providers")
 
 # --- Connectivity & Key Verification Strategies ---
 
+
 def verify_connectivity_run_command(provider, vm_name):
     hostname = provider.run_command(vm_name, "hostname")
     return hostname is not None and "Error" not in hostname
 
-def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path, retries=12, delay=10):
+
+def verify_connectivity_ssh_execute(
+    provider, vm_name, priv_key_path, retries=12, delay=10
+):
     import time
+
     info = provider.info(vm_name)
     ip = info.get("FloatingIP") or info.get("ip") or info.get("address")
     if not ip:
         return False
     user = provider.get_cloud_config(provider.cloud_name).get("username", "ubuntu")
-    
+
     for attempt in range(retries):
         hostname = provider._execute_ssh_command(ip, user, priv_key_path, "hostname")
         if hostname and "Error" not in hostname:
             return True
-        print(f"SSH service not ready yet (attempt {attempt+1}/{retries}), waiting {delay}s...")
+        print(
+            f"SSH service not ready yet (attempt {attempt + 1}/{retries}), waiting {delay}s..."
+        )
         time.sleep(delay)
-        
+
     return False
+
 
 # def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path):
 #     # This is for providers that might not have run_command but have _execute_ssh_command
@@ -107,10 +120,14 @@ def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path, retries=12
 #     hostname = provider._execute_ssh_command(ip, user, priv_key_path, "hostname")
 #     return "Error" not in hostname
 
+
 def verify_connectivity_multipass_exec(provider, vm_name):
     # Multipass uses a specific CLI execution
-    result = subprocess.run(["multipass", "exec", vm_name, "--", "hostname"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["multipass", "exec", vm_name, "--", "hostname"], capture_output=True, text=True
+    )
     return result.returncode == 0
+
 
 def verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, strategy):
     with open(pub_key_path, "r") as f:
@@ -133,12 +150,17 @@ def verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, strategy
         return "SSH Error" not in result
 
     elif strategy == "multipass_exec":
-        result = subprocess.run(["multipass", "exec", vm_name, "--", "bash", "-c", verify_cmd], capture_output=True)
+        result = subprocess.run(
+            ["multipass", "exec", vm_name, "--", "bash", "-c", verify_cmd],
+            capture_output=True,
+        )
         return result.returncode == 0
 
     return False
 
+
 # --- Fixtures ---
+
 
 @pytest.fixture
 def ssh_key(tmp_path):
@@ -146,10 +168,10 @@ def ssh_key(tmp_path):
     pub_key_path = tmp_path / "id_rsa.pub"
     subprocess.run(
         ["ssh-keygen", "-t", "rsa", "-b", "2048", "-f", str(key_path), "-N", ""],
-        check=True, capture_output=True
+        check=True,
+        capture_output=True,
     )
     return str(key_path), str(pub_key_path)
-
 
 
 def create_temp_config(tmp_path, provider_cfg):
@@ -161,7 +183,7 @@ def create_temp_config(tmp_path, provider_cfg):
         "clouds": {
             provider_cfg.name: {
                 "username": "smoke_test_user",
-                **provider_cfg.cloud_config
+                **provider_cfg.cloud_config,
             }
         }
     }
@@ -171,7 +193,9 @@ def create_temp_config(tmp_path, provider_cfg):
 
     return str(config_file)
 
+
 # --- Unified Test ---
+
 
 @pytest.mark.parametrize("provider_cfg", PROVIDER_CONFIGS, ids=lambda x: x.name)
 def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
@@ -197,7 +221,6 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
         with StopWatch.timer(f"{provider_cfg.name}_check_reqs"):
             assert provider.check_requirements() is True
 
-
     banner(f"Fetching images for provider: {provider_cfg.name}")
     with StopWatch.timer(f"{provider_cfg.name}_get_images"):
         images = provider.get_images()
@@ -213,7 +236,7 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
     # VM Name generation
     cloud_config = provider.get_cloud_config(provider_cfg.name)
     image_name = cloud_config.get("image", "")
-    
+
     if image_name.startswith("CC"):
         raw_username = "cc"
     else:
@@ -222,12 +245,13 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
     username = raw_username.replace("_", "-")
     vm_name = f"smoke-lifecycle-{username}-{uuid.uuid4().hex[:6]}"
 
-
     print(f"Generated VM name: {vm_name}")
     print(f"Using temporary config: {temp_config}")
     print(f"Using SSH key: {priv_key_path} and public key: {pub_key_path}")
     print(f"Provider config: {provider_cfg.cloud_config}")
-    print(f"Provider running status: {provider_cfg.running_status}, stopped status: {provider_cfg.stopped_status}") 
+    print(
+        f"Provider running status: {provider_cfg.running_status}, stopped status: {provider_cfg.stopped_status}"
+    )
     print(f"Connectivity strategy: {provider_cfg.connectivity_strategy}")
     print(f"Has shelve feature: {provider_cfg.has_shelve}")
     print(f"Custom verify key function: {provider_cfg.custom_verify_key}")
@@ -235,11 +259,10 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
     print(f"Provider instance: {provider}")
     print(f"Provider cloud name: {provider.cloud_name}")
     print(f"Provider cloud config: {provider.get_cloud_config(provider.cloud_name)}")
-    
-    #print(f"Provider images: {provider.get_images()}")
-    #print(f"Provider flavors: {provider.get_flavors()}")    
-    
-    
+
+    # print(f"Provider images: {provider.get_images()}")
+    # print(f"Provider flavors: {provider.get_flavors()}")
+
     try:
         # 0. Cleanup
         try:
@@ -273,14 +296,29 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
             assert provider.upload_key(pub_key_path, "smoke-key", vm_name) is True
 
         with StopWatch.timer(f"{provider_cfg.name}_verify_key"):
-            assert verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, provider_cfg.connectivity_strategy) is True
+            assert (
+                verify_key_presence(
+                    provider,
+                    vm_name,
+                    pub_key_path,
+                    priv_key_path,
+                    provider_cfg.connectivity_strategy,
+                )
+                is True
+            )
 
         with StopWatch.timer(f"{provider_cfg.name}_delete_key"):
             assert provider.delete_key("smoke-key", vm_name) is True
 
         with StopWatch.timer(f"{provider_cfg.name}_verify_key_deleted"):
             # We check that the key is NOT present
-            assert not verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, provider_cfg.connectivity_strategy)
+            assert not verify_key_presence(
+                provider,
+                vm_name,
+                pub_key_path,
+                priv_key_path,
+                provider_cfg.connectivity_strategy,
+            )
 
         # 4. Provider-specific features (e.g. Shelve)
         # if provider_cfg.has_shelve:

@@ -1,8 +1,8 @@
-import pytest
 import uuid
-from cloudmesh.ai.vm.factory import factory
-from cloudmesh.ai.vm.state_manager import StateManager
+
+import pytest
 from cloudmesh.ai.common.stopwatch import StopWatch
+
 
 def run_lifecycle_test(provider, cloud_name, vm_name):
     """Helper to run the lifecycle test logic."""
@@ -39,7 +39,10 @@ def run_lifecycle_test(provider, cloud_name, vm_name):
 
         StopWatch.benchmark(tag=f"{cloud_name} Integration {vm_name}")
 
-@pytest.mark.parametrize("cloud_name", ["aws", "azure", "google", "lima", "vbox", "wsl2"])
+
+@pytest.mark.parametrize(
+    "cloud_name", ["aws", "azure", "google", "lima", "vbox", "wsl2"]
+)
 def test_provider_integration(get_provider, cloud_name):
     """
     Integration test for various VM providers.
@@ -48,7 +51,9 @@ def test_provider_integration(get_provider, cloud_name):
     try:
         provider = get_provider(cloud_name)
     except Exception as e:
-        pytest.skip(f"Credentials for {cloud_name} not configured or provider error: {e}")
+        pytest.skip(
+            f"Credentials for {cloud_name} not configured or provider error: {e}"
+        )
 
     vm_name = f"int-test-{cloud_name}-{uuid.uuid4().hex[:6]}"
     run_lifecycle_test(provider, cloud_name, vm_name)

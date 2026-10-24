@@ -1,17 +1,19 @@
-import os
-import yaml
 import sys
 import traceback
+
+import yaml
+from cloudmesh.ai.common.stopwatch import StopWatch
 from rich.console import Console
 from rich.text import Text
-from cloudmesh.ai.common.stopwatch import StopWatch
-from cloudmesh.ai.command import vm
+
 from cloudmesh.ai.command.vm._shared.context import state
 from cloudmesh.ai.vm.state_manager import StateManager
 
+
 def print_header(msg):
-    print ()
+    print()
     Console().print(f"\n[bold blue]=== {msg} ===[/bold blue]\n")
+
 
 def print_debug_info(msg, result):
     print(f"DEBUG: {msg}")
@@ -21,7 +23,13 @@ def print_debug_info(msg, result):
     if result.exception:
         print("DEBUG: Exception:", result.exception)
         print("DEBUG: Exception traceback:")
-        traceback.print_exception(type(result.exception), result.exception, result.exception.__traceback__, file=sys.stdout)
+        traceback.print_exception(
+            type(result.exception),
+            result.exception,
+            result.exception.__traceback__,
+            file=sys.stdout,
+        )
+
 
 class CliStep:
     def __init__(self, msg, timer_name=None):
@@ -55,42 +63,44 @@ class CliStep:
         if exc_type:
             # Ignore pytest.skip to avoid noise during deliberate skips
             if "Skip" not in exc_type.__name__:
-                Console().print(f"\n[bold red]Exception in step '{self.msg}':[/bold red]")
+                Console().print(
+                    f"\n[bold red]Exception in step '{self.msg}':[/bold red]"
+                )
                 traceback.print_exception(exc_type, exc_val, exc_tb, file=sys.stdout)
 
         # 3. Exit timing context
         if self.timer_name:
             StopWatch.stop(self.timer_name)
             value = StopWatch.get(self.timer_name)
-            Console().print(f"[bold green]Step '{self.msg}' completed in {value:.2f} seconds[/bold green]\n")
+            Console().print(
+                f"[bold green]Step '{self.msg}' completed in {value:.2f} seconds[/bold green]\n"
+            )
+
 
 def cli_step(msg, timer_name=None):
     """Context manager for CLI test steps."""
     return CliStep(msg, timer_name)
 
+
 def setup_cli_config(tmp_path, provider_name, config_data):
-
-
     """
     Sets up a temporary config file and injects it into the CLI's state proxy.
     """
     config_dir = tmp_path / ".config" / "cloudmesh"
     config_dir.mkdir(parents=True)
     config_file = config_dir / "clouds.yaml"
-    
+
     # Merge provider config into the base config
     full_config = {
         "username": "smoke_test_user",
-        "clouds": {
-            provider_name: config_data
-        }
+        "clouds": {provider_name: config_data},
     }
-    
+
     with open(config_file, "w") as f:
         yaml.dump(full_config, f)
-    
+
     # Inject a new StateManager instance into the global state proxy
     new_manager = StateManager(str(config_file))
     state.set_manager(new_manager)
-    
+
     return str(config_file)

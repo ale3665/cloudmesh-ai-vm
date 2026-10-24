@@ -1,17 +1,21 @@
-import json
-import yaml
 import datetime
+import json
 import sys
-from cloudmesh.ai.vm.providers import get_provider
-import chi.server
+
 import chi.lease
 import chi.network
+import chi.server
+import yaml
+
+from cloudmesh.ai.vm.providers import get_provider
+
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
     if isinstance(obj, (datetime.datetime, datetime.date)):
         return obj.isoformat()
     return str(obj)
+
 
 def initialize_chameleon_auth():
     """Initializes the chameleon provider and sets up the chi context. Returns provider if successful."""
@@ -23,6 +27,7 @@ def initialize_chameleon_auth():
         print(f"Error initializing provider: {e}")
         return None
 
+
 def get_instance_from_name(instance_name):
     """Retrieves an instance object by its name."""
     if not initialize_chameleon_auth():
@@ -31,31 +36,43 @@ def get_instance_from_name(instance_name):
     try:
         instances = chi.server.list_servers()
         for instance in instances:
-
-            print (instance)
+            print(instance)
 
             if getattr(instance, "name", None) == instance_name:
                 return instance
     except Exception as e:
         print(f"Error fetching instance details for {instance_name}: {e}")
     print("========")
-        
+
     return None
+
 
 def get_reservation_details(reservation_id):
     """Finds the lease and reservation details for a given reservation ID."""
     try:
         leases = chi.lease.list_leases()
-        res_types = ["flavor_reservations", "node_reservations", "fip_reservations", "network_reservations", "device_reservations"]
+        res_types = [
+            "flavor_reservations",
+            "node_reservations",
+            "fip_reservations",
+            "network_reservations",
+            "device_reservations",
+        ]
 
         for l in leases:
             for res_type in res_types:
                 reservations = getattr(l, res_type, [])
                 for res in reservations:
-                    r_id = res.get("id") if isinstance(res, dict) else getattr(res, "id", None)
+                    r_id = (
+                        res.get("id")
+                        if isinstance(res, dict)
+                        else getattr(res, "id", None)
+                    )
                     if r_id == reservation_id:
+
                         def get_val(obj, key, default="N/A"):
-                            if isinstance(obj, dict): return obj.get(key, default)
+                            if isinstance(obj, dict):
+                                return obj.get(key, default)
                             return getattr(obj, key, default)
 
                         return {
@@ -70,13 +87,16 @@ def get_reservation_details(reservation_id):
                                 "id": get_val(res, "id"),
                                 "resource_type": get_val(res, "resource_type"),
                                 "status": get_val(res, "status"),
-                                "resource_properties": get_val(res, "resource_properties"),
+                                "resource_properties": get_val(
+                                    res, "resource_properties"
+                                ),
                                 "amount": get_val(res, "amount"),
-                            }
+                            },
                         }
     except Exception as e:
         return {"error": f"Could not fetch reservation details: {e}"}
     return None
+
 
 def get_security_group_details(server):
     """Retrieves security groups and their rules for the server."""
@@ -100,21 +120,37 @@ def get_security_group_details(server):
 
         sg_details = []
         for sg in sgs:
-            name = sg.get("name") if isinstance(sg, dict) else getattr(sg, "name", str(sg))
+            name = (
+                sg.get("name") if isinstance(sg, dict) else getattr(sg, "name", str(sg))
+            )
             try:
                 # Use chi.network to get rules for this SG
                 result = chi.network.neutron().list_security_group_rules(name)
-                rules = result.get("security_group_rules", []) if isinstance(result, dict) else result
+                rules = (
+                    result.get("security_group_rules", [])
+                    if isinstance(result, dict)
+                    else result
+                )
 
                 seen_rules = set()
                 unique_rules = []
                 for r in rules:
                     rule_data = {
-                        "protocol": r.get("protocol") if isinstance(r, dict) else getattr(r, "protocol", "Unknown"),
-                        "port_range_min": r.get("port_range_min") if isinstance(r, dict) else getattr(r, "port_range_min", "Unknown"),
-                        "port_range_max": r.get("port_range_max") if isinstance(r, dict) else getattr(r, "port_range_max", "Unknown"),
-                        "remote_ip": r.get("remote_ip_prefix") if isinstance(r, dict) else getattr(r, "remote_ip_prefix", "Unknown"),
-                        "direction": r.get("direction") if isinstance(r, dict) else getattr(r, "direction", "Unknown"),
+                        "protocol": r.get("protocol")
+                        if isinstance(r, dict)
+                        else getattr(r, "protocol", "Unknown"),
+                        "port_range_min": r.get("port_range_min")
+                        if isinstance(r, dict)
+                        else getattr(r, "port_range_min", "Unknown"),
+                        "port_range_max": r.get("port_range_max")
+                        if isinstance(r, dict)
+                        else getattr(r, "port_range_max", "Unknown"),
+                        "remote_ip": r.get("remote_ip_prefix")
+                        if isinstance(r, dict)
+                        else getattr(r, "remote_ip_prefix", "Unknown"),
+                        "direction": r.get("direction")
+                        if isinstance(r, dict)
+                        else getattr(r, "direction", "Unknown"),
                     }
                     # Clean up None values to "Any"
                     for key, val in rule_data.items():
@@ -127,15 +163,15 @@ def get_security_group_details(server):
                         seen_rules.add(rule_tuple)
                         unique_rules.append(rule_data)
 
-                sg_details.append({
-                    "name": name,
-                    "rules": unique_rules
-                })
+                sg_details.append({"name": name, "rules": unique_rules})
             except Exception as e:
-                sg_details.append({"name": name, "error": f"Could not fetch rules: {e}"})
+                sg_details.append(
+                    {"name": name, "error": f"Could not fetch rules: {e}"}
+                )
         return sg_details
     except Exception as e:
         return {"error": f"Could not fetch security groups: {e}"}
+
 
 def get_uuid(instance_name):
     """Resolves a VM name to its UUID."""
@@ -164,6 +200,7 @@ def get_uuid(instance_name):
         pass
 
     return None
+
 
 def get_instance_details(server):
     # 1. Use the provider system for authentication (same as cmx vm list)
@@ -211,9 +248,15 @@ def get_instance_details(server):
 
         # Enhance Provider Info with Flavor details from resource_properties
         if reservation_info and "reservation" in reservation_info:
-            res_props_raw = reservation_info["reservation"].get("resource_properties", "{}")
+            res_props_raw = reservation_info["reservation"].get(
+                "resource_properties", "{}"
+            )
             try:
-                res_props = json.loads(res_props_raw) if isinstance(res_props_raw, str) else res_props_raw
+                res_props = (
+                    json.loads(res_props_raw)
+                    if isinstance(res_props_raw, str)
+                    else res_props_raw
+                )
 
                 info["Flavor"] = {
                     "id": res_props.get("id"),
@@ -222,7 +265,7 @@ def get_instance_details(server):
                     "disk": res_props.get("disk"),
                     "vcpus": res_props.get("vcpus"),
                     "extra_specs": res_props.get("extra_specs"),
-                    "reservation_id": res_id
+                    "reservation_id": res_id,
                 }
             except Exception:
                 pass
@@ -240,7 +283,8 @@ def get_instance_details(server):
                 name = sg["name"]
                 rules_summary = []
                 for r in sg.get("rules", []):
-                    if not isinstance(r, dict): continue
+                    if not isinstance(r, dict):
+                        continue
 
                     proto = r.get("protocol", "Any")
                     p_min = r.get("port_range_min", "Any")
@@ -254,20 +298,28 @@ def get_instance_details(server):
                     elif proto == "icmp" and p_min == "Any" and remote == "Any":
                         summary = f"ICMP {direction}"
                     elif proto == "tcp" and p_min == "22" and p_max == "22":
-                        remote_label = "All" if remote in ["0.0.0.0/0", "Any"] else remote
+                        remote_label = (
+                            "All" if remote in ["0.0.0.0/0", "Any"] else remote
+                        )
                         summary = f"SSH {direction} from {remote_label}"
                     else:
                         port_str = f"{p_min}-{p_max}" if p_min != p_max else str(p_min)
-                        remote_label = "All" if remote in ["0.0.0.0/0", "Any"] else remote
+                        remote_label = (
+                            "All" if remote in ["0.0.0.0/0", "Any"] else remote
+                        )
                         summary = f"{proto} {port_str} {direction} from {remote_label}"
 
                     if summary not in rules_summary:
                         rules_summary.append(summary)
 
-                simplified_sgs.append({
-                    "name": name,
-                    "summary": "; ".join(rules_summary) if rules_summary else "No rules"
-                })
+                simplified_sgs.append(
+                    {
+                        "name": name,
+                        "summary": "; ".join(rules_summary)
+                        if rules_summary
+                        else "No rules",
+                    }
+                )
             info["SecurityGroups"] = simplified_sgs
         elif isinstance(sg_info, dict) and "error" in sg_info:
             info["SecurityGroups"] = sg_info["error"]
@@ -276,7 +328,7 @@ def get_instance_details(server):
             "chi_raw_details": raw_details,
             "reservation_details": reservation_info,
             "security_groups": sg_info,
-            "vm_info": info
+            "vm_info": info,
         }
     except Exception as e:
         print(f"Error extracting details from server object: {e}")
@@ -285,6 +337,7 @@ def get_instance_details(server):
     return full_details
 
     return full_details
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
@@ -305,6 +358,7 @@ if __name__ == "__main__":
         print(json.dumps(details, indent=4, default=json_serial))
 
         print("\n--- Instance Details (YAML) ---")
+
         def make_serializable(obj):
             if isinstance(obj, dict):
                 return {k: make_serializable(v) for k, v in obj.items()}
@@ -312,8 +366,14 @@ if __name__ == "__main__":
                 return [make_serializable(i) for i in obj]
             elif isinstance(obj, (datetime.datetime, datetime.date)):
                 return obj.isoformat()
-            return str(obj) if not isinstance(obj, (int, float, bool, type(None))) else obj
+            return (
+                str(obj) if not isinstance(obj, (int, float, bool, type(None))) else obj
+            )
 
-        print(yaml.dump(make_serializable(details), default_flow_style=False, sort_keys=False))
+        print(
+            yaml.dump(
+                make_serializable(details), default_flow_style=False, sort_keys=False
+            )
+        )
     else:
         print("Could not retrieve details for the instance.")

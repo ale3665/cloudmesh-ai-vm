@@ -1,41 +1,39 @@
-import json
-import yaml
 import datetime
+import json
+import logging
 import os
 import warnings
-import logging
-from pprint import pprint
 
+import yaml
 
 # Suppress the specific neutronclient deprecation warning globally in this module
 warnings.filterwarnings(
-    "ignore",
-    message=".*python binding code in neutronclient is deprecated.*"
+    "ignore", message=".*python binding code in neutronclient is deprecated.*"
 )
 
 # Also suppress via logging in case the library uses logging.warning
 logging.getLogger("neutronclient").setLevel(logging.ERROR)
 
-from pathlib import Path
-from typing import List, Dict, Any, Optional
-from cloudmesh.ai.vm.CloudBaseManager import CloudBaseManager
-from cloudmesh.ai.vm.exceptions import ConfigError, VMResourceError, VMProviderError
-from datetime import timedelta
-from datetime import datetime
-import humanize
-
-import sys
+import builtins
 import time
 import traceback
-import uuid
 from contextlib import redirect_stdout
+from datetime import datetime, timedelta
 from io import StringIO
+from typing import Any
+
 import chi
-import chi.lease
 import chi.exception
-from chi import keypair, lease, network, server
-from .ChameleonAuthManager import authenticate_chi_from_cloud
+import chi.lease
+import humanize
+from chi import network
+
+from cloudmesh.ai.vm.CloudBaseManager import CloudBaseManager
+from cloudmesh.ai.vm.exceptions import ConfigError, VMProviderError, VMResourceError
 from cloudmesh.ai.vm.logger import logger
+
+from .ChameleonAuthManager import authenticate_chi_from_cloud
+
 
 def DDD(msg):
     if isinstance(msg, dict):
@@ -43,6 +41,7 @@ def DDD(msg):
     else:
         msg = str(msg)
     print(msg)
+
 
 class Provider(CloudBaseManager):
     """
@@ -65,16 +64,28 @@ class Provider(CloudBaseManager):
         """Finds the lease and reservation details for a given reservation ID."""
         try:
             leases = chi.lease.list_leases()
-            res_types = ["flavor_reservations", "node_reservations", "fip_reservations", "network_reservations", "device_reservations"]
+            res_types = [
+                "flavor_reservations",
+                "node_reservations",
+                "fip_reservations",
+                "network_reservations",
+                "device_reservations",
+            ]
 
             for l in leases:
                 for res_type in res_types:
                     reservations = getattr(l, res_type, [])
                     for res in reservations:
-                        r_id = res.get("id") if isinstance(res, dict) else getattr(res, "id", None)
+                        r_id = (
+                            res.get("id")
+                            if isinstance(res, dict)
+                            else getattr(res, "id", None)
+                        )
                         if r_id == reservation_id:
+
                             def get_val(obj, key, default="N/A"):
-                                if isinstance(obj, dict): return obj.get(key, default)
+                                if isinstance(obj, dict):
+                                    return obj.get(key, default)
                                 return getattr(obj, key, default)
 
                             return {
@@ -89,9 +100,11 @@ class Provider(CloudBaseManager):
                                     "id": get_val(res, "id"),
                                     "resource_type": get_val(res, "resource_type"),
                                     "status": get_val(res, "status"),
-                                    "resource_properties": get_val(res, "resource_properties"),
+                                    "resource_properties": get_val(
+                                        res, "resource_properties"
+                                    ),
                                     "amount": get_val(res, "amount"),
-                                }
+                                },
                             }
         except Exception as e:
             return {"error": f"Could not fetch reservation details: {e}"}
@@ -115,20 +128,38 @@ class Provider(CloudBaseManager):
 
             sg_details = []
             for sg in sgs:
-                name = sg.get("name") if isinstance(sg, dict) else getattr(sg, "name", str(sg))
+                name = (
+                    sg.get("name")
+                    if isinstance(sg, dict)
+                    else getattr(sg, "name", str(sg))
+                )
                 try:
                     result = chi.network.neutron().list_security_group_rules(name)
-                    rules = result.get("security_group_rules", []) if isinstance(result, dict) else result
+                    rules = (
+                        result.get("security_group_rules", [])
+                        if isinstance(result, dict)
+                        else result
+                    )
 
                     seen_rules = set()
                     unique_rules = []
                     for r in rules:
                         rule_data = {
-                            "protocol": r.get("protocol") if isinstance(r, dict) else getattr(r, "protocol", "Unknown"),
-                            "port_range_min": r.get("port_range_min") if isinstance(r, dict) else getattr(r, "port_range_min", "Unknown"),
-                            "port_range_max": r.get("port_range_max") if isinstance(r, dict) else getattr(r, "port_range_max", "Unknown"),
-                            "remote_ip": r.get("remote_ip_prefix") if isinstance(r, dict) else getattr(r, "remote_ip_prefix", "Unknown"),
-                            "direction": r.get("direction") if isinstance(r, dict) else getattr(r, "direction", "Unknown"),
+                            "protocol": r.get("protocol")
+                            if isinstance(r, dict)
+                            else getattr(r, "protocol", "Unknown"),
+                            "port_range_min": r.get("port_range_min")
+                            if isinstance(r, dict)
+                            else getattr(r, "port_range_min", "Unknown"),
+                            "port_range_max": r.get("port_range_max")
+                            if isinstance(r, dict)
+                            else getattr(r, "port_range_max", "Unknown"),
+                            "remote_ip": r.get("remote_ip_prefix")
+                            if isinstance(r, dict)
+                            else getattr(r, "remote_ip_prefix", "Unknown"),
+                            "direction": r.get("direction")
+                            if isinstance(r, dict)
+                            else getattr(r, "direction", "Unknown"),
                         }
                         for key, val in rule_data.items():
                             if val is None:
@@ -139,7 +170,9 @@ class Provider(CloudBaseManager):
                             unique_rules.append(rule_data)
                     sg_details.append({"name": name, "rules": unique_rules})
                 except Exception as e:
-                    sg_details.append({"name": name, "error": f"Could not fetch rules: {e}"})
+                    sg_details.append(
+                        {"name": name, "error": f"Could not fetch rules: {e}"}
+                    )
             return sg_details
         except Exception as e:
             return {"error": f"Could not fetch security groups: {e}"}
@@ -150,7 +183,7 @@ class Provider(CloudBaseManager):
             return
 
         CLOUD_NAME = os.getenv("OS_CLOUD", "chameleon")
-        self.print(f"Authentication at site KVM@TACC...")
+        self.print("Authentication at site KVM@TACC...")
 
         try:
             authenticate_chi_from_cloud(CLOUD_NAME)
@@ -162,7 +195,7 @@ class Provider(CloudBaseManager):
 
         self._chi_initialized = True
 
-    def info(self, name: str, kind: str = "vm") -> Dict[str, Any]:
+    def info(self, name: str, kind: str = "vm") -> dict[str, Any]:
         """
         Returns detailed information about a Chameleon VM.
         :param name: Name of the VM.
@@ -188,7 +221,9 @@ class Provider(CloudBaseManager):
                     if hasattr(v, "__dict__") or isinstance(v, (set, complex)):
                         cleaned_attrs[k] = str(v)
                     elif isinstance(v, list):
-                        cleaned_attrs[k] = [str(i) if hasattr(i, "__dict__") else i for i in v]
+                        cleaned_attrs[k] = [
+                            str(i) if hasattr(i, "__dict__") else i for i in v
+                        ]
                     else:
                         cleaned_attrs[k] = v
 
@@ -209,9 +244,15 @@ class Provider(CloudBaseManager):
 
                 # Enhance Provider Info with Flavor details from resource_properties
                 if reservation_info and "reservation" in reservation_info:
-                    res_props_raw = reservation_info["reservation"].get("resource_properties", "{}")
+                    res_props_raw = reservation_info["reservation"].get(
+                        "resource_properties", "{}"
+                    )
                     try:
-                        res_props = json.loads(res_props_raw) if isinstance(res_props_raw, str) else res_props_raw
+                        res_props = (
+                            json.loads(res_props_raw)
+                            if isinstance(res_props_raw, str)
+                            else res_props_raw
+                        )
                         info["Flavor"] = {
                             "id": res_props.get("id"),
                             "name": res_props.get("name"),
@@ -219,7 +260,7 @@ class Provider(CloudBaseManager):
                             "disk": res_props.get("disk"),
                             "vcpus": res_props.get("vcpus"),
                             "extra_specs": res_props.get("extra_specs"),
-                            "reservation_id": res_id
+                            "reservation_id": res_id,
                         }
                     except Exception:
                         pass
@@ -236,7 +277,8 @@ class Provider(CloudBaseManager):
                         name_sg = sg["name"]
                         rules_summary = []
                         for r in sg.get("rules", []):
-                            if not isinstance(r, dict): continue
+                            if not isinstance(r, dict):
+                                continue
                             proto = r.get("protocol", "Any")
                             p_min = r.get("port_range_min", "Any")
                             p_max = r.get("port_range_max", "Any")
@@ -247,18 +289,28 @@ class Provider(CloudBaseManager):
                             elif proto == "icmp" and p_min == "Any" and remote == "Any":
                                 summary = f"ICMP {direction}"
                             elif proto == "tcp" and p_min == "22" and p_max == "22":
-                                remote_label = "All" if remote in ["0.0.0.0/0", "Any"] else remote
+                                remote_label = (
+                                    "All" if remote in ["0.0.0.0/0", "Any"] else remote
+                                )
                                 summary = f"SSH {direction} from {remote_label}"
                             else:
-                                port_str = f"{p_min}-{p_max}" if p_min != p_max else str(p_min)
-                                remote_label = "All" if remote in ["0.0.0.0/0", "Any"] else remote
+                                port_str = (
+                                    f"{p_min}-{p_max}" if p_min != p_max else str(p_min)
+                                )
+                                remote_label = (
+                                    "All" if remote in ["0.0.0.0/0", "Any"] else remote
+                                )
                                 summary = f"{proto} {port_str} {direction} from {remote_label}"
                             if summary not in rules_summary:
                                 rules_summary.append(summary)
-                        simplified_sgs.append({
-                            "name": name_sg,
-                            "summary": "; ".join(rules_summary) if rules_summary else "No rules"
-                        })
+                        simplified_sgs.append(
+                            {
+                                "name": name_sg,
+                                "summary": "; ".join(rules_summary)
+                                if rules_summary
+                                else "No rules",
+                            }
+                        )
                     info["SecurityGroups"] = simplified_sgs
                 elif isinstance(sg_info, dict) and "error" in sg_info:
                     info["SecurityGroups"] = sg_info["error"]
@@ -267,14 +319,13 @@ class Provider(CloudBaseManager):
                     "chi_raw_details": raw_details,
                     "reservation_details": reservation_info,
                     "security_groups": sg_info,
-                    "vm_info": info
+                    "vm_info": info,
                 }
             else:
                 full_details = {"vm_info": info}
         except Exception as e:
             logger.error(f"Error getting raw chi details for {name}: {e}")
             full_details = {"vm_info": info}
-
 
         if kind == "all":
             return full_details
@@ -306,11 +357,14 @@ class Provider(CloudBaseManager):
         Maps an OpenStack flavor name to a Chameleon node type.
         """
         cloud_config = self.get_cloud_config("chameleon")
-        mapping = cloud_config.get("node_type_mapping", {
-            "m1.small": "compute_haswell",
-            "m1.medium": "compute_haswell",
-            "m1.large": "compute_haswell",
-        })
+        mapping = cloud_config.get(
+            "node_type_mapping",
+            {
+                "m1.small": "compute_haswell",
+                "m1.medium": "compute_haswell",
+                "m1.large": "compute_haswell",
+            },
+        )
         return mapping.get(flavor, "compute_haswell")
 
     def _get_current_status(self, name: str) -> str:
@@ -334,7 +388,14 @@ class Provider(CloudBaseManager):
         except Exception:
             return False
 
-    def start(self, name: Optional[str] = None, flavor: Optional[str] = None, image: Optional[str] = None, duration: Optional[str] = None, **kwargs) -> str:
+    def start(
+        self,
+        name: str | None = None,
+        flavor: str | None = None,
+        image: str | None = None,
+        duration: str | None = None,
+        **kwargs,
+    ) -> str:
         """Starts a VM in Chameleon using the chi library, automatically creating a reservation."""
         self._setup_chi_context()
         cloud_config = self.get_cloud_config("chameleon")
@@ -342,26 +403,30 @@ class Provider(CloudBaseManager):
         flavor_name = flavor or cloud_config.get("flavor")
         security_group = cloud_config.get("security_group", "default")
 
-        username = cloud_config.get("username", "user").replace('_', '-')
+        username = cloud_config.get("username", "user").replace("_", "-")
         key_name = cloud_config.get("key_name", username)
         assign_ip = kwargs.get("assign_ip", True)
 
         # Parse duration string (e.g., '3h', '1d') to timedelta
-        lease_duration_td = timedelta(hours=1) # Default
+        lease_duration_td = timedelta(hours=1)  # Default
         if duration:
             try:
                 unit = duration[-1].lower()
                 value = int(duration[:-1])
-                if unit == 'h':
+                if unit == "h":
                     lease_duration_td = timedelta(hours=value)
-                elif unit == 'd':
+                elif unit == "d":
                     lease_duration_td = timedelta(days=value)
-                elif unit == 'm':
+                elif unit == "m":
                     lease_duration_td = timedelta(minutes=value)
                 else:
-                    self.print(f"Warning: Unsupported duration unit '{unit}'. Falling back to 1 hour.")
+                    self.print(
+                        f"Warning: Unsupported duration unit '{unit}'. Falling back to 1 hour."
+                    )
             except Exception as e:
-                self.print(f"Warning: Could not parse duration '{duration}': {e}. Falling back to 1 hour.")
+                self.print(
+                    f"Warning: Could not parse duration '{duration}': {e}. Falling back to 1 hour."
+                )
 
         # Ensure keypair exists and matches the local key
         key_path = cloud_config.get("key_path", "~/.ssh/id_rsa.pub")
@@ -375,16 +440,20 @@ class Provider(CloudBaseManager):
 
         # Read the local public key to verify against the cloud
         try:
-            with open(key_filename, 'r') as f:
+            with open(key_filename, "r") as f:
                 local_pub_key = f.read().strip()
         except Exception as e:
-            raise VMProviderError(f"Could not read local public key at {key_filename}: {e}")
+            raise VMProviderError(
+                f"Could not read local public key at {key_filename}: {e}"
+            )
 
         if key_name in existing_keys:
             if existing_keys[key_name] == local_pub_key:
                 self.print(f"✅ Using existing matching keypair: {key_name}")
             else:
-                self.print(f"Keypair {key_name} exists but does not match local key. Updating...")
+                self.print(
+                    f"Keypair {key_name} exists but does not match local key. Updating..."
+                )
                 try:
                     chi.server.update_keypair(key_name, local_pub_key)
                     self.print(f"✅ Keypair {key_name} updated with local key")
@@ -401,7 +470,7 @@ class Provider(CloudBaseManager):
                 raise VMProviderError(f"Failed to upload keypair {key_name}: {e}")
 
         # Print essential launch information
-        self.print(f"Launching VM with the following configuration:")
+        self.print("Launching VM with the following configuration:")
         self.print(f"  Server Name:    {name or f'vm-{self.cloud_name}'}")
         self.print(f"  Image:          {image_name}")
         self.print(f"  Flavor:         {flavor_name}")
@@ -424,16 +493,22 @@ class Provider(CloudBaseManager):
 
             if not name and self.cloud_name in ["jetstream", "chameleon"]:
                 username_fmt = cloud_config.get("username", "user")
-                site = cloud_config.get("site", self.cloud_name).replace("_", "-").replace("@", "").lower()
-                vm_name = f"{vm_name}-{username_fmt}" if site == self.cloud_name else f"{vm_name}-{site}-{username_fmt}"
+                site = (
+                    cloud_config.get("site", self.cloud_name)
+                    .replace("_", "-")
+                    .replace("@", "")
+                    .lower()
+                )
+                vm_name = (
+                    f"{vm_name}-{username_fmt}"
+                    if site == self.cloud_name
+                    else f"{vm_name}-{site}-{username_fmt}"
+                )
 
             res_name = f"res-{vm_name}"
 
             # Use the high-level chi.lease.Lease pattern from standalone tests
-            lease = chi.lease.Lease(
-                res_name,
-                duration=lease_duration_td
-            )
+            lease = chi.lease.Lease(res_name, duration=lease_duration_td)
 
             # We must reserve the specific flavor being requested
             flavor_id = chi.server.get_flavor_id(flavor_name)
@@ -445,7 +520,9 @@ class Provider(CloudBaseManager):
             lease.wait(status="active", timeout=300)
 
             reservation_id = lease.id
-            self.print(f"Lease {res_name} is active (ID: {reservation_id}). Proceeding to launch VM...")
+            self.print(
+                f"Lease {res_name} is active (ID: {reservation_id}). Proceeding to launch VM..."
+            )
 
             # 2. LAUNCH THE VIRTUAL MACHINE INSTANCE
             self.print("Launching server instance...")
@@ -474,13 +551,17 @@ class Provider(CloudBaseManager):
                         break
                     except chi.exception.ResourceError as e:
                         if "None of the ports can route" in str(e) and i < 9:
-                            self.print(f"  Port not ready yet, retrying in 3s... ({i+1}/10)")
+                            self.print(
+                                f"  Port not ready yet, retrying in 3s... ({i + 1}/10)"
+                            )
                             time.sleep(3)
                         else:
                             self.print(f"Error associating floating IP: {e}")
                             break
                 if not fip_addr:
-                    self.print("Timed out waiting for network ports to route Floating IP")
+                    self.print(
+                        "Timed out waiting for network ports to route Floating IP"
+                    )
 
             s.refresh()
 
@@ -490,7 +571,7 @@ class Provider(CloudBaseManager):
             sg_list = network.list_security_groups(name_filter=sg_name)
 
             # Find exact match to avoid partial name collisions
-            sg = next((g for g in sg_list if getattr(g, 'name', None) == sg_name), None)
+            sg = next((g for g in sg_list if getattr(g, "name", None) == sg_name), None)
 
             if sg:
                 self.print(f"✅ Found existing security group: {sg_name}")
@@ -498,7 +579,10 @@ class Provider(CloudBaseManager):
             else:
                 self.print(f"Creating new security group: {sg_name}...")
                 new_sg = network.SecurityGroup(
-                    {"name": sg_name, "description": f"Enable SSH and ICMP traffic for {username}"}
+                    {
+                        "name": sg_name,
+                        "description": f"Enable SSH and ICMP traffic for {username}",
+                    }
                 )
                 new_sg.submit()
                 sg_id = new_sg.id
@@ -524,11 +608,17 @@ class Provider(CloudBaseManager):
                     self.print(f"✅ Added {rule['protocol']} rule to {sg_name}")
                 except Exception as e:
                     if "Conflict" in str(e) or "409" in str(e):
-                        self.print(f"  Rule for {rule['protocol']} already exists, skipping...")
+                        self.print(
+                            f"  Rule for {rule['protocol']} already exists, skipping..."
+                        )
                     else:
-                        self.print(f"  Warning: Could not add {rule['protocol']} rule: {e}")
+                        self.print(
+                            f"  Warning: Could not add {rule['protocol']} rule: {e}"
+                        )
 
-            self.print(f"✅ Security group {sg_name} configured with SSH and ICMP rules")
+            self.print(
+                f"✅ Security group {sg_name} configured with SSH and ICMP rules"
+            )
 
             # Attach security group to the server instance
             s.add_security_group(sg_id)
@@ -539,26 +629,41 @@ class Provider(CloudBaseManager):
                 # This is common in cloud environments where IPs are recycled.
                 try:
                     import subprocess
-                    subprocess.run(["ssh-keygen", "-R", fip_addr], capture_output=True, check=False)
-                    self.print(f"✅ Cleared stale host key for {fip_addr} to ensure seamless SSH connection")
+
+                    subprocess.run(
+                        ["ssh-keygen", "-R", fip_addr], capture_output=True, check=False
+                    )
+                    self.print(
+                        f"✅ Cleared stale host key for {fip_addr} to ensure seamless SSH connection"
+                    )
                 except Exception as e:
-                    self.print(f"  Warning: Could not clear host key for {fip_addr}: {e}")
+                    self.print(
+                        f"  Warning: Could not clear host key for {fip_addr}: {e}"
+                    )
 
                 # Use 'cc' for images starting with CC-, otherwise use config username
-                ssh_user = "cc" if image_name and image_name.startswith("CC-") else username
-                self.print(f"\nVM is ready! You can SSH in using:")
-                self.print(f"ssh -i {os.path.expanduser(cloud_config.get('key_path', '~/.ssh/id_rsa'))} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {ssh_user}@{fip_addr}")
+                ssh_user = (
+                    "cc" if image_name and image_name.startswith("CC-") else username
+                )
+                self.print("\nVM is ready! You can SSH in using:")
+                self.print(
+                    f"ssh -i {os.path.expanduser(cloud_config.get('key_path', '~/.ssh/id_rsa'))} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {ssh_user}@{fip_addr}"
+                )
 
             return vm_name
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             tb = traceback.format_exc()
             logger.error(f"CHI start failed for {self.cloud_name}: {e}\n{tb}")
-            raise VMProviderError(f"CHI start failed for {self.cloud_name}: {e}\n{tb}") from e
+            raise VMProviderError(
+                f"CHI start failed for {self.cloud_name}: {e}\n{tb}"
+            ) from e
 
-    def stop(self, name: Optional[str] = None) -> bool:
+    def stop(self, name: str | None = None) -> bool:
         """Stops a Chameleon VM."""
-        if not name: return False
+        if not name:
+            return False
         self._setup_chi_context()
         try:
             server = chi.server.get_server(name)
@@ -569,12 +674,14 @@ class Provider(CloudBaseManager):
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI stop failed for {name}: {e}")
             return False
 
-    def restart(self, name: Optional[str] = None) -> bool:
+    def restart(self, name: str | None = None) -> bool:
         """Restarts a Chameleon VM."""
-        if not name: return False
+        if not name:
+            return False
         self._setup_chi_context()
         try:
             server = chi.server.get_server(name)
@@ -584,12 +691,14 @@ class Provider(CloudBaseManager):
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI restart failed for {name}: {e}")
             return False
 
-    def suspend(self, name: Optional[str] = None) -> bool:
+    def suspend(self, name: str | None = None) -> bool:
         """Suspends a Chameleon VM."""
-        if not name: return False
+        if not name:
+            return False
         self._setup_chi_context()
         try:
             server = chi.server.get_server(name)
@@ -599,20 +708,21 @@ class Provider(CloudBaseManager):
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI suspend failed for {name}: {e}")
             return False
 
-    def delete(self, name: Optional[str] = None) -> bool:
+    def delete(self, name: str | None = None) -> bool:
         """Deletes a Chameleon VM by name, ID, or fallback to single active server."""
-        if not name: 
+        if not name:
             return False
-            
+
         print(f"Deleting Chameleon VM: {name}")
         self._setup_chi_context()
         try:
             server = None
             servers = chi.server.list_servers()
-            
+
             # 1. Try direct lookup via get_server
             try:
                 server = chi.server.get_server(name)
@@ -622,40 +732,51 @@ class Provider(CloudBaseManager):
             # 2. Try matching name or ID from the list
             if not server:
                 for s in servers:
-                    s_name = getattr(s, 'name', '')
-                    s_id = str(getattr(s, 'id', ''))
-                    print (f"Checking server: {s_name} ({s_id})")
-                    if s_name == name or s_id == name or name in s_id or s_id.startswith(str(name)):
+                    s_name = getattr(s, "name", "")
+                    s_id = str(getattr(s, "id", ""))
+                    print(f"Checking server: {s_name} ({s_id})")
+                    if (
+                        s_name == name
+                        or s_id == name
+                        or name in s_id
+                        or s_id.startswith(str(name))
+                    ):
                         server = s
                         break
 
-            # 3. Ultimate Fallback: If only ONE server exists in this project/site, 
+            # 3. Ultimate Fallback: If only ONE server exists in this project/site,
             # assume this is the one the user meant to delete (handles internal UUID mismatch)
             if not server and len(servers) == 1:
                 server = servers[0]
-                print(f"Notice: '{name}' did not match directly, but exactly one server was found. Targeting: {server.name}")
+                print(
+                    f"Notice: '{name}' did not match directly, but exactly one server was found. Targeting: {server.name}"
+                )
 
             if not server:
                 from cloudmesh.ai.vm.logger import logger
+
                 logger.warning(f"CHI delete: Server '{name}' not found.")
                 return False
 
-            server_id = getattr(server, 'id', None)
-            server_name = getattr(server, 'name', name)
+            server_id = getattr(server, "id", None)
+            server_name = getattr(server, "name", name)
 
             # 4. Safely release floating IP using the actual server name
             try:
                 self.release_floating_ip(server_name)
             except Exception as fip_err:
                 from cloudmesh.ai.vm.logger import logger
-                logger.info(f"Note: Could not release floating IP for {server_name}: {fip_err}")
+
+                logger.info(
+                    f"Note: Could not release floating IP for {server_name}: {fip_err}"
+                )
 
             # 5. Delete the server using its reliable ID
             if server_id:
                 chi.server.delete_server(server_id)
                 print(f"Successfully deleted server: {server_name} ({server_id})")
                 return True
-            elif hasattr(server, 'delete'):
+            elif hasattr(server, "delete"):
                 server.delete()
                 print(f"Successfully deleted server object: {server_name}")
                 return True
@@ -663,10 +784,13 @@ class Provider(CloudBaseManager):
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI delete failed for {name}: {e}")
             raise VMProviderError(f"CHI delete failed for {name}: {e}") from e
-        
-    def _resolve_flavor_name(self, flavor_val: Any, flavor_map: Optional[Dict[str, str]] = None) -> str:
+
+    def _resolve_flavor_name(
+        self, flavor_val: Any, flavor_map: dict[str, str] | None = None
+    ) -> str:
         """
         Resolves a flavor value (which could be a flavor object, a flavor ID,
         or a 'reservation:UUID' string) to a human-readable flavor name.
@@ -674,14 +798,14 @@ class Provider(CloudBaseManager):
         if not flavor_val:
             return "Unknown"
 
-        if hasattr(flavor_val, 'name'):
+        if hasattr(flavor_val, "name"):
             return flavor_val.name
 
         if isinstance(flavor_val, str):
             lookup_val = flavor_val
             is_reservation = False
-            if flavor_val.startswith('reservation:'):
-                lookup_val = flavor_val.split(':', 1)[1]
+            if flavor_val.startswith("reservation:"):
+                lookup_val = flavor_val.split(":", 1)[1]
                 is_reservation = True
 
             try:
@@ -693,11 +817,18 @@ class Provider(CloudBaseManager):
                 if not flavor_map:
                     flavors = chi.server.list_flavors()
                     for f in flavors:
-                        if getattr(f, 'id', None) == lookup_val or getattr(f, 'name', None) == lookup_val:
+                        if (
+                            getattr(f, "id", None) == lookup_val
+                            or getattr(f, "name", None) == lookup_val
+                        ):
                             return f.name
 
                 # 3. Handle Reservations: Resolve UUID to human-readable name
-                if is_reservation or (isinstance(lookup_val, str) and len(lookup_val) == 36 and lookup_val.count('-') == 4):
+                if is_reservation or (
+                    isinstance(lookup_val, str)
+                    and len(lookup_val) == 36
+                    and lookup_val.count("-") == 4
+                ):
                     try:
                         # Try high-level CHI Lease object first
                         lease = chi.lease.Lease(lookup_val)
@@ -709,19 +840,35 @@ class Provider(CloudBaseManager):
                         # (Same logic used in _get_reservation_details)
                         leases = chi.lease.list_leases()
                         for l in leases:
-                            res_types = ["flavor_reservations", "node_reservations", "fip_reservations", "network_reservations", "device_reservations"]
+                            res_types = [
+                                "flavor_reservations",
+                                "node_reservations",
+                                "fip_reservations",
+                                "network_reservations",
+                                "device_reservations",
+                            ]
                             for res_type in res_types:
                                 reservations = getattr(l, res_type, [])
                                 for res in reservations:
-                                    r_id = res.get("id") if isinstance(res, dict) else getattr(res, "id", None)
+                                    r_id = (
+                                        res.get("id")
+                                        if isinstance(res, dict)
+                                        else getattr(res, "id", None)
+                                    )
                                     if r_id == lookup_val:
-                                        res_props = res.get("resource_properties", {}) if isinstance(res, dict) else getattr(res, "resource_properties", {})
+                                        res_props = (
+                                            res.get("resource_properties", {})
+                                            if isinstance(res, dict)
+                                            else getattr(res, "resource_properties", {})
+                                        )
                                         if isinstance(res_props, str):
                                             try:
                                                 res_props = json.loads(res_props)
                                             except:
                                                 res_props = {}
-                                        if isinstance(res_props, dict) and res_props.get("name"):
+                                        if isinstance(
+                                            res_props, dict
+                                        ) and res_props.get("name"):
                                             return res_props.get("name")
                     except Exception as e:
                         logger.debug(f"Reservation lookup failed for {lookup_val}: {e}")
@@ -747,8 +894,8 @@ class Provider(CloudBaseManager):
             addr_strings = []
             for addr in addr_list:
                 if isinstance(addr, dict):
-                    ip = addr.get('addr', 'Unknown')
-                    ip_type = addr.get('OS-EXT-IPS:type', 'unknown')
+                    ip = addr.get("addr", "Unknown")
+                    ip_type = addr.get("OS-EXT-IPS:type", "unknown")
                     addr_strings.append(f"{ip_type}:{ip}")
                 else:
                     addr_strings.append(str(addr))
@@ -759,25 +906,29 @@ class Provider(CloudBaseManager):
 
     def ttl_humanize(self, end_date):
         ttl_str = "Unknown"
-        
+
         try:
             if isinstance(end_date, datetime):
                 # Handle timezone awareness automatically
-                now = datetime.now(end_date.tzinfo) if end_date.tzinfo else datetime.now()
+                now = (
+                    datetime.now(end_date.tzinfo) if end_date.tzinfo else datetime.now()
+                )
                 ttl = end_date - now
-                
+
                 if ttl.total_seconds() < 0:
                     ttl_str = "Expired"
                 else:
                     # Strip out seconds and microseconds completely
                     total_seconds = int(ttl.total_seconds())
                     truncated_ttl = timedelta(seconds=(total_seconds // 60) * 60)
-                    
+
                     if truncated_ttl.total_seconds() == 0:
                         ttl_str = "Less than a minute"
                     else:
                         # precisedelta stops at minutes, showing hours and minutes cleanly
-                        ttl_str = humanize.precisedelta(truncated_ttl, minimum_unit="minutes")
+                        ttl_str = humanize.precisedelta(
+                            truncated_ttl, minimum_unit="minutes"
+                        )
 
             # print(ttl_str)
             # Note: Ensure tmp_name is passed as an argument or available as self.tmp_name if used here
@@ -788,7 +939,7 @@ class Provider(CloudBaseManager):
 
         return str(ttl_str)
 
-    def list(self) -> List[Dict[str, Any]]:
+    def list(self) -> list[dict[str, Any]]:
         """Lists all Chameleon VMs with their reachable IP addresses and TTL."""
         self._setup_chi_context()
         try:
@@ -801,7 +952,6 @@ class Provider(CloudBaseManager):
             try:
                 leases = chi.lease.list_leases()
                 for l in leases:
-
                     ttl_name = l.__dict__["name"].replace("res-", "")
 
                     try:
@@ -813,44 +963,67 @@ class Provider(CloudBaseManager):
                     except Exception as e:
                         print(f"Error calculating TTL: {e}")
 
-                    end_date = getattr(l, "end_date", None) if not isinstance(l, dict) else l.get("end_date")
-                    res_types = ["flavor_reservations", "node_reservations", "fip_reservations", "network_reservations", "device_reservations"]
+                    end_date = (
+                        getattr(l, "end_date", None)
+                        if not isinstance(l, dict)
+                        else l.get("end_date")
+                    )
+                    res_types = [
+                        "flavor_reservations",
+                        "node_reservations",
+                        "fip_reservations",
+                        "network_reservations",
+                        "device_reservations",
+                    ]
                     for res_type in res_types:
                         reservations = getattr(l, res_type, [])
                         for res in reservations:
-                            r_id = res.get("id") if isinstance(res, dict) else getattr(res, "id", None)
+                            r_id = (
+                                res.get("id")
+                                if isinstance(res, dict)
+                                else getattr(res, "id", None)
+                            )
                             if r_id:
-                                props = res.get("resource_properties", {}) if isinstance(res, dict) else getattr(res, "resource_properties", {})
+                                props = (
+                                    res.get("resource_properties", {})
+                                    if isinstance(res, dict)
+                                    else getattr(res, "resource_properties", {})
+                                )
                                 if isinstance(props, str):
                                     try:
                                         props = json.loads(props)
                                     except:
                                         props = {}
 
-                                tmp_name = props.get("name") if isinstance(props, dict) else "Unknown"
-                              
+                                tmp_name = (
+                                    props.get("name")
+                                    if isinstance(props, dict)
+                                    else "Unknown"
+                                )
+
                                 res_lookup[r_id] = {
                                     "name": tmp_name,
                                     "end_date": end_date,
                                     "ttl": ttl_data.get(ttl_name, "N/A"),
-                                    "vm_name": ttl_name
+                                    "vm_name": ttl_name,
                                 }
                                 # pprint(res_lookup[r_id])
                 # pprint(ttl_data)
 
             except Exception as e:
                 logger.debug(f"Could not pre-fetch leases: {e}")
-            
 
             # 2. Fetch standard flavors for non-reservation VMs
             flavor_map = {}
             try:
                 all_flavors = chi.server.list_flavors()
                 for f in all_flavors:
-                    f_id = getattr(f, 'id', None)
-                    f_name = getattr(f, 'name', None)
-                    if f_id: flavor_map[f_id] = f_name
-                    if f_name: flavor_map[f_name] = f_name
+                    f_id = getattr(f, "id", None)
+                    f_name = getattr(f, "name", None)
+                    if f_id:
+                        flavor_map[f_id] = f_name
+                    if f_name:
+                        flavor_map[f_name] = f_name
             except Exception as e:
                 logger.debug(f"Could not fetch flavor map: {e}")
 
@@ -860,24 +1033,30 @@ class Provider(CloudBaseManager):
             for s in servers:
                 # Format IP addresses
                 all_ips = []
-                addresses = getattr(s, 'addresses', None)
+                addresses = getattr(s, "addresses", None)
                 if addresses and isinstance(addresses, dict):
                     for net_name, addr_list in addresses.items():
                         for addr in addr_list:
                             if isinstance(addr, dict):
-                                all_ips.append(addr.get('addr', str(addr)))
+                                all_ips.append(addr.get("addr", str(addr)))
                             else:
                                 all_ips.append(str(addr))
                 ip = ", ".join(all_ips) if all_ips else "No IP"
 
                 # Resolve Flavor and TTL
-                flavor_val = getattr(s, 'flavor', None) or getattr(s, 'flavor_name', None)
+                flavor_val = getattr(s, "flavor", None) or getattr(
+                    s, "flavor_name", None
+                )
                 flavor_name = "Unknown"
                 ttl = "N/A"
 
                 if flavor_val:
                     # Handle Reservation IDs (e.g., "reservation:UUID" or just UUID)
-                    clean_id = flavor_val.split(':', 1)[1] if isinstance(flavor_val, str) and ':' in flavor_val else flavor_val
+                    clean_id = (
+                        flavor_val.split(":", 1)[1]
+                        if isinstance(flavor_val, str) and ":" in flavor_val
+                        else flavor_val
+                    )
 
                     if isinstance(clean_id, str) and clean_id in res_lookup:
                         flavor_name = res_lookup[clean_id]["name"]
@@ -886,44 +1065,53 @@ class Provider(CloudBaseManager):
                         if end_date_str:
                             try:
                                 end_date = datetime.datetime.fromisoformat(end_date_str)
-                                now = datetime.datetime.now(datetime.timezone.utc) if end_date.tzinfo else datetime.datetime.now()
+                                now = (
+                                    datetime.datetime.now(datetime.timezone.utc)
+                                    if end_date.tzinfo
+                                    else datetime.datetime.now()
+                                )
                                 diff = end_date - now
                                 if diff.total_seconds() > 0:
                                     days = diff.days
                                     hours, rem = divmod(diff.seconds, 3600)
                                     minutes, _ = divmod(rem, 60)
-                                    ttl = f"{days}d {hours}h {minutes}m" if days > 0 else f"{hours}h {minutes}m"
+                                    ttl = (
+                                        f"{days}d {hours}h {minutes}m"
+                                        if days > 0
+                                        else f"{hours}h {minutes}m"
+                                    )
                                 else:
                                     ttl = "Expired"
                             except:
                                 pass
                     elif isinstance(clean_id, str):
                         flavor_name = flavor_map.get(clean_id, clean_id)
-                    elif hasattr(clean_id, 'name'):
+                    elif hasattr(clean_id, "name"):
                         flavor_name = clean_id.name
 
-                results.append({
-                    "name": s.name,
-                    "id": s.id,
-                    "status": s.status,
-                    "ip": ip,
-                    "image": getattr(s, 'image_name', 'Unknown'),
-                    "flavor": flavor_name,
-                    "networks": self._format_networks(addresses),
-                    "ttl": ttl_data[s.name]
-                })
+                results.append(
+                    {
+                        "name": s.name,
+                        "id": s.id,
+                        "status": s.status,
+                        "ip": ip,
+                        "image": getattr(s, "image_name", "Unknown"),
+                        "flavor": flavor_name,
+                        "networks": self._format_networks(addresses),
+                        "ttl": ttl_data[s.name],
+                    }
+                )
 
             return results
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.warning(f"CHI list failed: {e}")
             return []
 
- 
-
     def _get_flavor_info(self, server) -> tuple[str, str, str]:
         """
-        Helper to resolve flavor name, RAM, and CPUs. 
+        Helper to resolve flavor name, RAM, and CPUs.
         For reservation-backed VMs, the flavor string itself is the reservation ID.
         """
         flavor_name = "N/A"
@@ -955,7 +1143,10 @@ class Provider(CloudBaseManager):
             if conn and flavor_name != "N/A":
                 try:
                     for f in conn.compute.flavors():
-                        if getattr(f, "id", None) == flavor_name or getattr(f, "name", None) == flavor_name:
+                        if (
+                            getattr(f, "id", None) == flavor_name
+                            or getattr(f, "name", None) == flavor_name
+                        ):
                             ram_val = getattr(f, "ram", None)
                             if ram_val:
                                 ram = f"{ram_val} MB"
@@ -971,9 +1162,7 @@ class Provider(CloudBaseManager):
 
         return flavor_name, ram, vcpus
 
-
-    
-    def _get_basic_info(self, name: str) -> Dict[str, Any]:
+    def _get_basic_info(self, name: str) -> dict[str, Any]:
         """Gets detailed information about a Chameleon VM."""
         try:
             server = chi.server.get_server(name)
@@ -982,7 +1171,11 @@ class Provider(CloudBaseManager):
                 raise VMResourceError(f"VM {name} not found")
 
             floating_ip = self._get_floating_ip(name)
-            key_name = getattr(server, 'key_name', None) or (server.keypair.name if hasattr(server, 'keypair') and server.keypair else "N/A")
+            key_name = getattr(server, "key_name", None) or (
+                server.keypair.name
+                if hasattr(server, "keypair") and server.keypair
+                else "N/A"
+            )
 
             # Call the helper function to get readable flavor metadata
             flavor_name, ram, vcpus = self._get_flavor_info(server)
@@ -996,7 +1189,9 @@ class Provider(CloudBaseManager):
                 "Flavor": flavor_name,
                 "Key": key_name,
                 "FloatingIP": floating_ip or "Not Assigned",
-                "PublicIPs": server.addresses if getattr(server, 'addresses', None) else {},
+                "PublicIPs": server.addresses
+                if getattr(server, "addresses", None)
+                else {},
                 "RAM": ram,
                 "CPUs": vcpus,
             }
@@ -1004,17 +1199,19 @@ class Provider(CloudBaseManager):
             raise
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"Error getting info for VM {name} in {self.cloud_name}: {e}")
-            raise VMProviderError(f"Error getting info for VM {name} in {self.cloud_name}: {e}") from e
-        
-    def info_old(self, name: str) -> Dict[str, Any]:
+            raise VMProviderError(
+                f"Error getting info for VM {name} in {self.cloud_name}: {e}"
+            ) from e
+
+    def info_old(self, name: str) -> dict[str, Any]:
         """Gets detailed information about a Chameleon VM."""
         self._setup_chi_context()
         try:
             server = chi.server.get_server(name)
             # from pprint import pprint
             # pprint(server.__dict__)
-
 
             if not server:
                 raise VMResourceError(f"VM {name} not found")
@@ -1029,18 +1226,23 @@ class Provider(CloudBaseManager):
                 "Image": server.image_name,
                 "Key": server.keypair,
                 "FloatingIP": floating_ip or "Not Assigned",
-                "PublicIPs": server.addresses if getattr(server, 'addresses', None) else [],
-                "RAM": getattr(server, 'ram', 'N/A'),
-                "CPUs": getattr(server, 'vcpus', 'N/A'),
+                "PublicIPs": server.addresses
+                if getattr(server, "addresses", None)
+                else [],
+                "RAM": getattr(server, "ram", "N/A"),
+                "CPUs": getattr(server, "vcpus", "N/A"),
             }
         except VMResourceError:
             raise
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
-            logger.error(f"Error getting info for VM {name} in {self.cloud_name}: {e}")
-            raise VMProviderError(f"Error getting info for VM {name} in {self.cloud_name}: {e}") from e
 
-    def login(self, name: Optional[str] = None) -> bool:
+            logger.error(f"Error getting info for VM {name} in {self.cloud_name}: {e}")
+            raise VMProviderError(
+                f"Error getting info for VM {name} in {self.cloud_name}: {e}"
+            ) from e
+
+    def login(self, name: str | None = None) -> bool:
         """Provides the SSH connection string for the Chameleon VM."""
         if not name:
             self.print("Error: VM name is required to login.")
@@ -1048,7 +1250,9 @@ class Provider(CloudBaseManager):
 
         floating_ip = self._get_floating_ip(name)
         if not floating_ip:
-            self.print(f"No floating IP found for VM {name}. Use 'cmc vm assign-floating-ip' first.")
+            self.print(
+                f"No floating IP found for VM {name}. Use 'cmc vm assign-floating-ip' first."
+            )
             return False
 
         cloud_config = self.get_cloud_config("chameleon")
@@ -1058,34 +1262,42 @@ class Provider(CloudBaseManager):
         # Note: This requires fetching the server to check the image name
         try:
             server = chi.server.get_server(name)
-            image_name = getattr(server, 'image_name', None)
+            image_name = getattr(server, "image_name", None)
             username = cloud_config.get("username", "ubuntu")
             user = "cc" if image_name and image_name.startswith("CC-") else username
         except Exception:
             user = cloud_config.get("username", "ubuntu")
 
-        self.print(f"Connect to your VM using:\nssh -i {key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {user}@{floating_ip}")
+        self.print(
+            f"Connect to your VM using:\nssh -i {key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {user}@{floating_ip}"
+        )
         return True
 
-    def _get_floating_ip(self, name: str) -> Optional[str]:
+    def _get_floating_ip(self, name: str) -> str | None:
         """Internal helper to retrieve the floating IP address of a VM."""
         self._setup_chi_context()
         try:
             server = chi.server.get_server(name)
             if not server:
                 return None
-            addresses = getattr(server, 'addresses', {})
+            addresses = getattr(server, "addresses", {})
             if not addresses:
                 return None
             for net_name, addr_list in addresses.items():
                 for addr in addr_list:
-                    if isinstance(addr, dict) and addr.get('OS-EXT-IPS:type') == 'floating':
-                        return addr.get('addr')
-                    elif isinstance(addr, str) and addr.startswith('129.'): # Heuristic for Chameleon FIPs
+                    if (
+                        isinstance(addr, dict)
+                        and addr.get("OS-EXT-IPS:type") == "floating"
+                    ):
+                        return addr.get("addr")
+                    elif isinstance(addr, str) and addr.startswith(
+                        "129."
+                    ):  # Heuristic for Chameleon FIPs
                         return addr
             return None
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.debug(f"Error getting floating IP for VM {name}: {e}")
             return None
 
@@ -1099,22 +1311,22 @@ class Provider(CloudBaseManager):
             # Try the standard resolver first
             sg = chi.network._resolve_resource("security_group", sg_name)
             if isinstance(sg, dict):
-                return sg['id']
-            return getattr(sg, 'id', sg_name)
+                return sg["id"]
+            return getattr(sg, "id", sg_name)
         except Exception:
             # Fallback: manually list and find the first match
             groups = chi.network.list_security_groups()
             for g in groups:
-                if g['name'] == sg_name:
-                    return g['id']
+                if g["name"] == sg_name:
+                    return g["id"]
 
         # If it's already a UUID, return it as is
-        if len(sg_name) == 36 and sg_name.count('-') == 4:
+        if len(sg_name) == 36 and sg_name.count("-") == 4:
             return sg_name
 
         raise VMResourceError(f"Could not resolve security group {sg_name} to an ID")
 
-    def assign_floating_ip(self, name: str) -> Optional[str]:
+    def assign_floating_ip(self, name: str) -> str | None:
         """Assigns an available floating IP to the VM with retries for network routing."""
         self._setup_chi_context()
         try:
@@ -1127,12 +1339,15 @@ class Provider(CloudBaseManager):
                     return server.associate_floating_ip()
                 except chi.exception.ResourceError as e:
                     if "None of the ports can route" in str(e) and i < 9:
-                        self.print(f"  Port not ready yet, retrying in 3s... ({i+1}/10)")
+                        self.print(
+                            f"  Port not ready yet, retrying in 3s... ({i + 1}/10)"
+                        )
                         time.sleep(3)
                     else:
                         raise e
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI assign_floating_ip failed for {name}: {e}")
             return None
 
@@ -1152,14 +1367,16 @@ class Provider(CloudBaseManager):
             if "404" in str(e) or "not found" in str(e).lower():
                 return False
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI release_floating_ip failed for {name}: {e}")
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI release_floating_ip failed for {name}: {e}")
             return False
 
-    def list_regions(self) -> List[Dict[str, Any]]:
+    def list_regions(self) -> builtins.list[dict[str, Any]]:
         """Lists available sites/regions in Chameleon Cloud."""
         self._setup_chi_context()
         try:
@@ -1172,7 +1389,15 @@ class Provider(CloudBaseManager):
             self.print(f"Error listing Chameleon regions: {e}")
             return []
 
-    def create_reservation(self, name: str, node_type: str, count: int, start_date: str = None, end_date: str = None, duration: int = None) -> Optional[str]:
+    def create_reservation(
+        self,
+        name: str,
+        node_type: str,
+        count: int,
+        start_date: str = None,
+        end_date: str = None,
+        duration: int = None,
+    ) -> str | None:
         """
         Creates a node reservation (lease) in Chameleon Cloud using python-chi.
         Returns the reservation ID if successful, None otherwise.
@@ -1199,12 +1424,16 @@ class Provider(CloudBaseManager):
                 start_date=s,
                 end_date=e,
             )
-            return lease.get('id') if isinstance(lease, dict) else getattr(lease, 'id', None)
+            return (
+                lease.get("id")
+                if isinstance(lease, dict)
+                else getattr(lease, "id", None)
+            )
         except Exception as e:
             self.print(f"Error creating reservation in Chameleon: {e}")
             return None
 
-    def get_account_info(self) -> Dict[str, Any]:
+    def get_account_info(self) -> dict[str, Any]:
         """Returns account information for Chameleon using chi."""
         self._setup_chi_context()
         try:
@@ -1213,13 +1442,15 @@ class Provider(CloudBaseManager):
                 "project_name": chi.get("project_name"),
                 "project_id": chi.get("project_id"),
                 "user_id": chi.get("user_id"),
-                "allocation": chi.get("allocation") if hasattr(chi, "get") else "Unknown"
+                "allocation": chi.get("allocation")
+                if hasattr(chi, "get")
+                else "Unknown",
             }
         except Exception as e:
             self.print(f"Error fetching Chameleon account info: {e}")
-            return {"error": f"Failed to fetch Chameleon account info: {str(e)}"}
+            return {"error": f"Failed to fetch Chameleon account info: {e!s}"}
 
-    def get_images(self, **kwargs) -> List[Dict[str, Any]]:
+    def get_images(self, **kwargs) -> builtins.list[dict[str, Any]]:
         """Lists all available images in Chameleon Cloud using python-chi."""
         self._setup_chi_context()
         try:
@@ -1228,26 +1459,32 @@ class Provider(CloudBaseManager):
             return [{"id": img.uuid, "name": img.name} for img in images]
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI get_images failed for {self.cloud_name}: {e}")
             return []
 
-    def get_flavors(self, **kwargs) -> List[Dict[str, Any]]:
+    def get_flavors(self, **kwargs) -> builtins.list[dict[str, Any]]:
         """Lists available flavors in Chameleon Cloud."""
         self._setup_chi_context()
         try:
             flavors = chi.server.list_flavors()
-            return [{"id": f.id, "name": f.name, "ram": f.ram, "vcpus": f.vcpus} for f in flavors]
+            return [
+                {"id": f.id, "name": f.name, "ram": f.ram, "vcpus": f.vcpus}
+                for f in flavors
+            ]
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI get_flavors failed: {e}")
             return []
 
-    def get_keys(self) -> List[Dict[str, Any]]:
+    def get_keys(self) -> builtins.list[dict[str, Any]]:
         """Lists available keys in Chameleon Cloud."""
         self._setup_chi_context()
         try:
-            import hashlib
             import base64
+            import hashlib
+
             keys = chi.server.list_keypair()
             results = []
             for k in keys:
@@ -1267,24 +1504,28 @@ class Provider(CloudBaseManager):
             return results
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI get_keys failed: {e}")
             return []
 
-    def upload_key(self, key_path: str, key_name: str, vm_name: Optional[str] = None) -> bool:
+    def upload_key(
+        self, key_path: str, key_name: str, vm_name: str | None = None
+    ) -> bool:
         """Uploads a public key to Chameleon Cloud."""
         self._setup_chi_context()
         try:
             key_path = os.path.expanduser(key_path)
-            with open(key_path, 'r') as f:
+            with open(key_path, "r") as f:
                 public_key = f.read()
             chi.server.update_keypair(key_name, public_key)
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI upload_key failed for {key_name}: {e}")
             return False
 
-    def delete_key(self, key_name: str, vm_name: Optional[str] = None) -> bool:
+    def delete_key(self, key_name: str, vm_name: str | None = None) -> bool:
         """Deletes a public key from Chameleon Cloud."""
         self._setup_chi_context()
         try:
@@ -1292,10 +1533,11 @@ class Provider(CloudBaseManager):
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI delete_key failed for {key_name}: {e}")
             return False
 
-    def get_security_groups(self) -> List[Dict[str, Any]]:
+    def get_security_groups(self) -> builtins.list[dict[str, Any]]:
         """Lists available security groups in Chameleon Cloud."""
         self._setup_chi_context()
         try:
@@ -1303,18 +1545,22 @@ class Provider(CloudBaseManager):
             return [{"name": g.name, "description": g.description} for g in groups]
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI get_security_groups failed: {e}")
             return []
 
-    def get_security_group_info(self, name: str) -> Dict[str, Any]:
+    def get_security_group_info(self, name: str) -> dict[str, Any]:
         """Gets detailed information for a specific security group."""
         self._setup_chi_context()
         try:
             return chi.network._resolve_resource("security_group", name)
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI get_security_group_info failed for {name}: {e}")
-            raise VMProviderError(f"Could not get security group info for {name} in {self.cloud_name}: {e}") from e
+            raise VMProviderError(
+                f"Could not get security group info for {name} in {self.cloud_name}: {e}"
+            ) from e
 
     def create_security_group(self, name: str, description: str = "") -> bool:
         """Creates a security group in Chameleon Cloud."""
@@ -1325,6 +1571,7 @@ class Provider(CloudBaseManager):
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI create_security_group failed for {name}: {e}")
             return False
 
@@ -1334,10 +1581,11 @@ class Provider(CloudBaseManager):
         try:
             # Resolve name to ID
             sg = chi.network._resolve_resource("security_group", name)
-            chi.network.neutron().delete_security_group(sg['id'])
+            chi.network.neutron().delete_security_group(sg["id"])
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI delete_security_group failed for {name}: {e}")
             return False
 
@@ -1351,12 +1599,13 @@ class Provider(CloudBaseManager):
 
             # Resolve SG name to ID to avoid ambiguity
             sg = chi.network._resolve_resource("security_group", sg_name)
-            sg_id = sg['id'] if isinstance(sg, dict) else getattr(sg, 'id', sg_name)
+            sg_id = sg["id"] if isinstance(sg, dict) else getattr(sg, "id", sg_name)
 
             server.add_security_group(sg_id)
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI add_security_group_to_vm failed for {vm_name}: {e}")
             return False
 
@@ -1371,16 +1620,24 @@ class Provider(CloudBaseManager):
             return False
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI remove_security_group_from_vm failed for {vm_name}: {e}")
             return False
 
-    def add_security_group_rule(self, sg_name: str, protocol: str, port: str, cidr: str, direction: str = "ingress") -> str:
+    def add_security_group_rule(
+        self,
+        sg_name: str,
+        protocol: str,
+        port: str,
+        cidr: str,
+        direction: str = "ingress",
+    ) -> str:
         """Adds a security group rule. Returns the rule ID."""
         self._setup_chi_context()
         try:
             # Resolve SG name to ID
             sg = chi.network._resolve_resource("security_group", sg_name)
-            sg_id = sg['id']
+            sg_id = sg["id"]
 
             rule = chi.network.neutron().create_security_group_rule(
                 security_group_id=sg_id,
@@ -1388,13 +1645,16 @@ class Provider(CloudBaseManager):
                 protocol=protocol,
                 port_range_min=port,
                 port_range_max=port,
-                remote_ip_prefix=cidr
+                remote_ip_prefix=cidr,
             )
             return rule.id
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI add_security_group_rule failed for {sg_name}: {e}")
-            raise VMProviderError(f"Could not add security group rule for {sg_name} in {self.cloud_name}: {e}") from e
+            raise VMProviderError(
+                f"Could not add security group rule for {sg_name} in {self.cloud_name}: {e}"
+            ) from e
 
     def remove_security_group_rule(self, sg_name: str, rule_id: str) -> bool:
         """Removes a rule by ID."""
@@ -1404,10 +1664,11 @@ class Provider(CloudBaseManager):
             return True
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI remove_security_group_rule failed for {rule_id}: {e}")
             return False
 
-    def list_security_group_rules(self, sg_name: str) -> List[Dict[str, Any]]:
+    def list_security_group_rules(self, sg_name: str) -> builtins.list[dict[str, Any]]:
         """Lists rules for a group."""
         self._setup_chi_context()
         try:
@@ -1424,5 +1685,6 @@ class Provider(CloudBaseManager):
             ]
         except Exception as e:
             from cloudmesh.ai.vm.logger import logger
+
             logger.error(f"CHI list_security_group_rules failed for {sg_name}: {e}")
             return []

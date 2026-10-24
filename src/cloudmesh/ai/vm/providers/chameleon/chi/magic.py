@@ -1,5 +1,4 @@
 from datetime import timedelta
-from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -16,7 +15,7 @@ from .lease import Lease, delete_lease
 from .server import Server
 
 
-def visualize_resources(leases: List[Lease]):
+def visualize_resources(leases: list[Lease]):
     """
     Displays a visualization of the resources associated with the leases in a graph.
 
@@ -131,10 +130,10 @@ def create_container(
     container_name: str,
     device_type: str,
     container_image: str,
-    device_name: Optional[str] = None,
+    device_name: str | None = None,
     reserve_fip: bool = True,
-    exposed_ports: Optional[List[str]] = None,
-    runtime: Optional[str] = None,
+    exposed_ports: list[str] | None = None,
+    runtime: str | None = None,
     duration: timedelta = timedelta(hours=24),
     show: str = "widget",
 ) -> Container:
@@ -190,9 +189,9 @@ def create_container(
 
 def create_server(
     server_name: str,
-    network_name: Optional[str] = DEFAULT_NETWORK,
-    node_type: Optional[str] = None,
-    image_name: Optional[str] = None,
+    network_name: str | None = DEFAULT_NETWORK,
+    node_type: str | None = None,
+    image_name: str | None = None,
     reserve_fip: bool = True,
     duration: timedelta = timedelta(hours=24),
     show: str = "widget",
@@ -248,7 +247,7 @@ def create_server(
     return server
 
 
-def _get_user_input(options: List[str], description: str) -> str:
+def _get_user_input(options: list[str], description: str) -> str:
     print(f"Available {description}s:")
     for option in options:
         print(f"- {option}")

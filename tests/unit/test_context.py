@@ -1,13 +1,17 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
 import click
-from cloudmesh.ai.command.vm._shared.context import resolve_vms, VMContext
+import pytest
+
+from cloudmesh.ai.command.vm._shared.context import VMContext, resolve_vms
+
 
 @pytest.fixture
 def mock_ctx():
     ctx = MagicMock(spec=click.Context)
     ctx.obj = VMContext()
     return ctx
+
 
 @pytest.fixture
 def mock_provider():
@@ -23,10 +27,12 @@ def mock_provider():
     ]
     return provider
 
+
 @patch("cloudmesh.ai.command.vm._shared.context.get_active_provider")
 def test_resolve_vms_single_name(mock_get_provider, mock_ctx, mock_provider):
     mock_get_provider.return_value = mock_provider
     assert resolve_vms(mock_ctx, name="testuser-1") == ["testuser-1"]
+
 
 @patch("cloudmesh.ai.command.vm._shared.context.get_active_provider")
 def test_resolve_vms_range_expansion(mock_get_provider, mock_ctx, mock_provider):
@@ -35,6 +41,7 @@ def test_resolve_vms_range_expansion(mock_get_provider, mock_ctx, mock_provider)
     assert resolve_vms(mock_ctx, name="node[1-2]") == ["node-1", "node-2"]
     # Test range with existing base
     assert resolve_vms(mock_ctx, name="testuser[1-2]") == ["testuser-1", "testuser-2"]
+
 
 @patch("cloudmesh.ai.command.vm._shared.context.get_active_provider")
 def test_resolve_vms_wildcard_match(mock_get_provider, mock_ctx, mock_provider):
@@ -46,18 +53,23 @@ def test_resolve_vms_wildcard_match(mock_get_provider, mock_ctx, mock_provider):
     # Match with '?'
     assert resolve_vms(mock_ctx, name="testuser-?") == ["testuser-1", "testuser-2"]
 
+
 @patch("cloudmesh.ai.command.vm._shared.context.get_active_provider")
 def test_resolve_vms_regex_match(mock_get_provider, mock_ctx, mock_provider):
     mock_get_provider.return_value = mock_provider
     # Complex regex
     assert resolve_vms(mock_ctx, name=".*-prod-.*") == ["web-prod-1", "web-prod-2"]
 
+
 @patch("cloudmesh.ai.command.vm._shared.context.get_active_provider")
-def test_resolve_vms_no_match_raises_exception(mock_get_provider, mock_ctx, mock_provider):
+def test_resolve_vms_no_match_raises_exception(
+    mock_get_provider, mock_ctx, mock_provider
+):
     mock_get_provider.return_value = mock_provider
     with pytest.raises(click.ClickException) as excinfo:
         resolve_vms(mock_ctx, name="nonexistent-*")
     assert "No VMs found matching pattern" in str(excinfo.value)
+
 
 @patch("cloudmesh.ai.command.vm._shared.context.get_active_provider")
 def test_resolve_vms_count(mock_get_provider, mock_ctx, mock_provider):
@@ -68,6 +80,7 @@ def test_resolve_vms_count(mock_get_provider, mock_ctx, mock_provider):
     assert "db-master" in result
     assert "web-prod-2" in result
     assert len(result) == 2
+
 
 @patch("cloudmesh.ai.command.vm._shared.context.get_active_provider")
 @patch("cloudmesh.ai.command.vm._shared.context.state")

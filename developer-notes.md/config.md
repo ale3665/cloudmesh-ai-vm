@@ -49,10 +49,10 @@ from libcloud.compute.types import Provider
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
 
 def create_cloud_driver():
     """
@@ -77,6 +77,7 @@ def create_cloud_driver():
         logger.error(f"Failed to initialize cloud driver: {e}")
         raise
 
+
 def list_nodes(driver) -> None:
     """Fetches and displays detailed information about compute nodes."""
     try:
@@ -91,14 +92,15 @@ def list_nodes(driver) -> None:
             details = {
                 "Name": node.name,
                 "ID": node.id,
-                "Status": node.extra.get('status', 'UNKNOWN'),
+                "Status": node.extra.get("status", "UNKNOWN"),
                 "Public IP": node.public_ips[0] if node.public_ips else "N/A",
                 "Private IP": node.private_ips[0] if node.private_ips else "N/A",
             }
             print(f"--- \n" + "\n".join([f"{k}: {v}" for k, v in details.items()]))
-            
+
     except Exception as e:
         logger.error(f"Error retrieving nodes: {e}")
+
 
 def main():
     try:
@@ -106,6 +108,7 @@ def main():
         list_nodes(driver)
     except Exception as e:
         logger.critical(f"Application failed: {e}")
+
 
 if __name__ == "__main__":
     main()
