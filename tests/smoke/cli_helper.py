@@ -60,13 +60,12 @@ class CliStep:
             print_debug_info(f"Step '{self.msg}' failed automatically", self.result)
 
         # 2. Automatic traceback on Python exception
-        if exc_type:
-            # Ignore pytest.skip to avoid noise during deliberate skips
-            if "Skip" not in exc_type.__name__:
-                Console().print(
-                    f"\n[bold red]Exception in step '{self.msg}':[/bold red]"
-                )
-                traceback.print_exception(exc_type, exc_val, exc_tb, file=sys.stdout)
+        if exc_type and "Skip" not in exc_type.__name__:
+            Console().print(
+                f"\\n[bold red]Exception in step '{self.msg}':[/bold red]"
+            )
+            traceback.print_exception(exc_type, exc_val, exc_tb, file=sys.stdout)
+
 
         # 3. Exit timing context
         if self.timer_name:
