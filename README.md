@@ -7,7 +7,7 @@
 - **Unified Interface**: Manage different cloud providers using a single consistent CLI.
 - **Smart VM Lifecycle**:
     - **Automatic Naming**: VMs are named automatically using a `<username>-<counter>` pattern (e.g., `gregor-1`).
-    - **Contextual Memory**: The tool remembers the last used VM, allowing you to run commands like `cmx vm stop` without specifying a name.
+    - **Contextual Memory**: The tool remembers the last used VM (the most recently started or accessed instance), allowing you to run commands like `cmx vm stop` without specifying a name.
 - **Provider Flexibility**:
     - **Default Cloud**: Manage your active provider via `cmx vm provider set <cloud>`.
     - **Cloud Override**: Use the `--cloud` flag to temporarily use a different provider (e.g., `cmx vm start --cloud aws`).
@@ -17,7 +17,7 @@
 - **SSH Integration**: Generate suggested SSH configuration entries for existing VMs to enable seamless access via `ssh <hostname>`.
 - **Interactive Shell**: Enter a dedicated VM management shell using `cmx vm -i`.
 - **SDK Native**: OpenStack providers (Chameleon, Jetstream) are implemented using the official OpenStack SDK for maximum stability and feature support.
-- **Environment Diagnostics**: Use cmx vm doctor to validate provider requirements, configuration, and diagnostic information before running VM operations.
+- **Environment Diagnostics**: Use `cmx vm doctor` to validate provider requirements, configuration, and diagnostic information before running VM operations.
 
 The full documentation is available at: <https://cloudmesh-ai.github.io/cloudmesh-ai-vm/>
 
@@ -26,7 +26,7 @@ The full documentation is available at: <https://cloudmesh-ai.github.io/cloudmes
 ### 1. Installation
 
 ```bash
-git clone https://github.com/your-repo/cloudmesh-ai-vm.git
+git clone https://github.com/cloudmesh-ai/cloudmesh-ai-vm.git
 cd cloudmesh-ai-vm
 pip install -e .
 ```
@@ -69,20 +69,24 @@ cmx vm list
 cmx key scan
 cmx key github upload ~/.ssh/id_rsa.pub
 
+# Manage Security Groups (Example: create a web-server preset)
+cmx vm security-group create --name web-sg --preset web
+
 # Enter interactive VM shell
 cmx vm -i
-
 ```
 
-## VM Doctor
+## VM Doctor & Troubleshooting
 
-`cmx vm doctor` provides a non-destructive health check for the active VM provider. It helps detect missing dependencies, configuration problems, and provider availability issues before starting VM lifecycle operations.
+If you encounter issues with provider connectivity, missing dependencies, or configuration errors, use the `cmx vm doctor` command before performing lifecycle operations.
+
+`cmx vm doctor` provides a non-destructive health check for the active VM provider.
 
 The command performs the following checks:
 - **Provider Resolution**: Verifies that the requested or configured provider can be loaded.
 - **Requirements**: Checks whether required local tools and provider dependencies are available.
 - **Configuration**: Runs provider configuration validation when supported.
-- **Provider Information**: Retrieves provider diagnostic information when local requirements are available.
+- **Provider Info**: Retrieves provider diagnostic information when local requirements are available.
 
 Run Doctor using the currently selected provider:
 `cmx vm doctor`
