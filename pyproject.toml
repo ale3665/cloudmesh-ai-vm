@@ -38,6 +38,7 @@ dependencies = [
     "chameleon-blazarclient @ git+https://github.com/ChameleonCloud/python-blazarclient.git",
     "python-zunclient @ git+https://github.com/chameleoncloud/python-zunclient.git",
     "ccauth @ git+https://github.com/ChameleonCloud/ccauth.git",
+    "pre-commit",
 ]
 
 [project.scripts]

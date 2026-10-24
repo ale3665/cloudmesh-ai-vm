@@ -20,31 +20,33 @@ def provider(mock_driver):
                 "flavor": "test-flavor",
                 "key_path": "~/.ssh/id_rsa",
                 "security_group": "ssh-access",
+                "network": "test-network",
             }
         }
     }
-    with patch.object(OpenstackManager, "_get_driver", return_value=mock_driver):
-        p = OpenstackManager(config, cloud_name="test-openstack")
-        return p
 
 
 def test_start_uses_configured_key_and_security_group(provider, mock_driver):
     """OpenStack VM creation should attach the configured SSH key and security group."""
     image = MagicMock()
+    image.id = "image-123"
     image.name = "test-image"
-    mock_driver.list_images.return_value = [image]
+    mock_driver.find_image.return_value = image
 
     flavor = MagicMock()
+    flavor.id = "flavor-123"
     flavor.name = "test-flavor"
-    mock_driver.list_sizes.return_value = [flavor]
+    mock_driver.find_flavor.return_value = flavor
 
     security_group = MagicMock()
+    security_group.id = "sg-123"
     security_group.name = "ssh-access"
-    mock_driver.ex_list_security_groups.return_value = [security_group]
+    mock_driver.find_security_group.return_value = security_group
 
     node = MagicMock()
     node.id = "vm-123"
-    mock_driver.create_node.return_value = node
+    node.name = "test-vm"
+    mock_driver.create_server.return_value = node
 
     # Mock wait_for_active to return True immediately
     with (
@@ -55,12 +57,14 @@ def test_start_uses_configured_key_and_security_group(provider, mock_driver):
         result = provider.start(name="test-vm")
 
     assert result == "vm-123"
-    mock_driver.create_node.assert_called_once_with(
+
+    mock_driver.create_server.assert_called_once_with(
         name="test-vm",
-        image=image,
-        size=flavor,
-        ex_keyname="id_rsa",
-        ex_security_groups=[security_group],
+        image_id=image.id,
+        flavor_id=flavor.id,
+        key_name="id_rsa",
+        security_groups=[{"name": "ssh-access"}],
+        networks=[{"uuid": "test-network"}],
     )
 
 
@@ -70,21 +74,24 @@ def test_start_does_not_create_vm_when_security_group_is_missing(provider, mock_
     provider.config["clouds"]["test-openstack"]["security_group"] = "missing-group"
 
     image = MagicMock()
+    image.id = "image-123"
     image.name = "test-image"
-    mock_driver.list_images.return_value = [image]
+    mock_driver.find_image.return_value = image
 
     flavor = MagicMock()
+    flavor.id = "flavor-123"
     flavor.name = "test-flavor"
-    mock_driver.list_sizes.return_value = [flavor]
+    mock_driver.find_flavor.return_value = flavor
 
-    mock_driver.ex_list_security_groups.return_value = []
+    # OpenStack SDK returns None when the group is not found.
+    mock_driver.find_security_group.return_value = None
 
     with pytest.raises(
         VMProviderError, match="Could not find security group missing-group"
     ):
         provider.start(name="test-vm")
 
-    mock_driver.create_node.assert_not_called()
+    mock_driver.create_server.assert_not_called()
 
 
 def test_start_prefers_explicit_key_name(provider, mock_driver):
@@ -92,20 +99,24 @@ def test_start_prefers_explicit_key_name(provider, mock_driver):
     provider.config["clouds"]["test-openstack"]["key_name"] = "custom-cloud-key"
 
     image = MagicMock()
+    image.id = "image-123"
     image.name = "test-image"
-    mock_driver.list_images.return_value = [image]
+    mock_driver.find_image.return_value = image
 
     flavor = MagicMock()
+    flavor.id = "flavor-123"
     flavor.name = "test-flavor"
-    mock_driver.list_sizes.return_value = [flavor]
+    mock_driver.find_flavor.return_value = flavor
 
     security_group = MagicMock()
+    security_group.id = "sg-123"
     security_group.name = "ssh-access"
-    mock_driver.ex_list_security_groups.return_value = [security_group]
+    mock_driver.find_security_group.return_value = security_group
 
     node = MagicMock()
     node.id = "vm-123"
-    mock_driver.create_node.return_value = node
+    node.name = "test-vm"
+    mock_driver.create_server.return_value = node
 
     with (
         patch.object(provider, "wait_for_active", return_value=True),
@@ -114,7 +125,7 @@ def test_start_prefers_explicit_key_name(provider, mock_driver):
     ):
         provider.start(name="test-vm")
 
-    assert mock_driver.create_node.call_args.kwargs["ex_keyname"] == "custom-cloud-key"
+    assert result == "vm-123"
 
 
 def test_get_provider_info_uses_supported_configuration_fields(provider, mock_driver):

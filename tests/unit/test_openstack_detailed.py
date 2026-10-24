@@ -5,7 +5,11 @@ import pytest
 from cloudmesh.ai.vm.exceptions import VMProviderError
 from cloudmesh.ai.vm.openstack.OpenstackManager import OpenstackManager
 
-# Mock configuration for OpenStack tests
+import pytest
+
+from cloudmesh.ai.vm.openstack.OpenstackManager import OpenstackManager
+
+
 MOCK_CONFIG = {
     "clouds": {
         "test-openstack": {
@@ -13,6 +17,7 @@ MOCK_CONFIG = {
             "flavor": "test-flavor",
             "auth_url": "https://example.invalid/v3/",
             "region_name": "RegionOne",
+            "floating_ip_pool": "public",
         }
     }
 }
@@ -24,48 +29,45 @@ class TestOpenstackDetailed:
     floating IP logic, and error handling.
     """
 
-    @pytest.fixture
-    def provider(self):
-        driver = MagicMock()
-        with patch.object(OpenstackManager, "_get_driver", return_value=driver):
-            provider = OpenstackManager(MOCK_CONFIG, cloud_name="test-openstack")
-            provider.driver = driver
-            return provider
+@pytest.fixture
+def provider():
+    return OpenstackManager(
+        MOCK_CONFIG,
+        cloud_name="test-openstack",
+    )
 
-    def test_run_cli_command_success(self, provider):
-        """Verify that _run_cli_command correctly sets env vars and returns output."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="success-output")
 
-            result = provider._run_cli_command(["openstack", "server", "list"])
+def test_list_sdk_success(provider):
+    conn = MagicMock()
 
-            assert result == "success-output"
-            # Verify env vars were set
-            args, kwargs = mock_run.call_args
-            assert kwargs["env"]["OS_CLOUD"] == "test-openstack"
+    server = SimpleNamespace(
+        name="vm1",
+        id="id1",
+        status="ACTIVE",
+        addresses={
+            "private": [{"addr": "10.0.0.1"}],
+            "floating": [{"addr": "1.2.3.4"}],
+        },
+        image=SimpleNamespace(name="img1"),
+        flavor=SimpleNamespace(name="flv1"),
+    )
 
-    def test_run_cli_command_failure(self, provider):
-        """Verify that _run_cli_command raises VMProviderError on non-zero exit."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1, stderr="some error")
+    conn.compute.servers.return_value = [server]
 
-            with pytest.raises(VMProviderError, match="CLI command failed"):
-                provider._run_cli_command(["openstack", "server", "list"])
+    with patch.object(provider, "_get_sdk_conn", return_value=conn):
+        vms = provider.list()
 
-    def test_list_cli_fallback_success(self, provider):
-        """Test that list() falls back to CLI when libcloud returns no results."""
-        # 1. Mock libcloud to return empty list
-        provider.driver.list_nodes.return_value = []
+    assert len(vms) == 1
+    assert vms[0]["name"] == "vm1"
+    assert vms[0]["id"] == "id1"
+    assert vms[0]["status"] == "ACTIVE"
+    assert vms[0]["ip"] == "1.2.3.4"
+    assert vms[0]["image"] == "img1"
+    assert vms[0]["flavor"] == "flv1"
 
-        # 2. Mock CLI output
-        mock_cli_output = "Name\tID\tStatus\tImage\tFlavor\tNetworks\nvm1\tid1\tACTIVE\timg1\tflv1\tnet1"
-        with patch.object(provider, "_run_cli_command", return_value=mock_cli_output):
-            vms = provider.list()
 
-            assert len(vms) == 1
-            assert vms[0]["name"] == "vm1"
-            assert vms[0]["id"] == "id1"
-            assert vms[0]["status"] == "ACTIVE"
+def test_get_floating_ip_success(provider):
+    conn = MagicMock()
 
     def test_get_floating_ip_success(self, provider):
         """Verify _get_floating_ip correctly parses the 'addresses' output."""
@@ -87,15 +89,11 @@ class TestOpenstackDetailed:
             ip = provider._get_floating_ip("test-vm")
             assert ip is None
 
-    def test_assign_floating_ip_success(self, provider):
-        """Test assigning a floating IP via CLI."""
-        # Mock driver objects
-        mock_node = MagicMock()
-        mock_node.name = "test-vm"
-        mock_node.id = "id-123"
+    with patch.object(provider, "_get_sdk_conn", return_value=conn):
+        ip = provider._get_floating_ip("test-vm")
 
-        mock_fip = MagicMock()
-        mock_fip.ip = "1.2.3.4"
+    assert ip == "1.2.3.4"
+    conn.compute.find_server.assert_called_once_with("test-vm")
 
         provider.driver.ex_create_floating_ip.return_value = mock_fip
         provider.driver._find_node.return_value = (
@@ -113,17 +111,12 @@ class TestOpenstackDetailed:
                 mock_node, mock_fip
             )
 
-    def test_release_floating_ip_success(self, provider):
-        """Test releasing a floating IP."""
-        # Mock driver objects
-        mock_node = MagicMock()
-        mock_node.name = "test-vm"
-        mock_node.public_ips = ["1.2.3.4"]
+    conn.compute.find_server.return_value = server
 
-        mock_fip = MagicMock()
-        mock_fip.ip = "1.2.3.4"
+    with patch.object(provider, "_get_sdk_conn", return_value=conn):
+        ip = provider._get_floating_ip("test-vm")
 
-        provider.driver.ex_get_floating_ip.return_value = mock_fip
+    assert ip is None
 
         with patch.object(provider, "_find_node", return_value=mock_node):
             result = provider.release_floating_ip("test-vm")
