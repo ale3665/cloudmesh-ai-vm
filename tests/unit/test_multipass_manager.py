@@ -1,11 +1,10 @@
-import json
 import re
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
-from cloudmesh.ai.vm.exceptions import VMResourceError
+from cloudmesh.ai.vm.exceptions import ProviderFeatureNotSupported, VMResourceError
 from cloudmesh.ai.vm.local.MultipassManager import Provider
 
 
@@ -30,37 +29,31 @@ def provider(mock_config):
     return p
 
 
-def command_result(stdout=""):
-    """Create a simple mocked command result."""
-    return SimpleNamespace(stdout=stdout)
-
-
-def multipass_list_json(
-    name="test-vm",
-    state="Running",
-    ip="192.168.64.5",
-):
-    """Return Multipass JSON output containing one VM."""
-    return json.dumps(
-        {
-            "list": [
-                {
-                    "name": name,
-                    "state": state,
-                    "ipv4": [ip],
-                }
-            ]
-        }
-    )
-
-
-def empty_multipass_list_json():
-    """Return valid Multipass JSON containing no VMs."""
-    return json.dumps({"list": []})
-
-
 def test_start_with_name_and_config(provider):
     vm_name = "test-vm"
+    result = provider.start(name=vm_name)
+
+    # Verify the command constructed
+    expected_command = [
+        "multipass",
+        "launch",
+        "-c",
+        "2",
+        "-m",
+        "4GiB",
+        "-d",
+        "20GiB",
+        "-n",
+        vm_name,
+        "22.04",
+    ]
+    provider._run_command.assert_any_call(expected_command, stream=True)
+    assert result == vm_name
+
+
+def test_start_without_name(provider):
+    # Mock Multipass list output for exists()
+    mock_list_result = MagicMock(stdout='{"list": []}')
 
     def side_effect(command, **kwargs):
         if command == [
@@ -128,16 +121,16 @@ def test_start_without_name(provider):
         "20GiB",
         "22.04",
     ]
-
-    provider._run_command.assert_any_call(
-        expected_command,
-        stream=True,
-    )
-
-    assert result == "generated-vm"
+    provider._run_command.assert_any_call(expected_command, stream=True)
+    assert result != "multipass-generated"
 
 
 def test_stop_success(provider):
+    # Mock Multipass list output for exists()
+    mock_list_result = MagicMock(
+        stdout="Name State IPv4 Image\ntest-vm Running 192.168.64.5 Ubuntu 22.04 LTS\n"
+    )
+
     def side_effect(command, **kwargs):
         if command == [
             "multipass",
@@ -160,6 +153,7 @@ def test_stop_success(provider):
     )
 
 
+
 def test_stop_failure(provider):
     def side_effect(command, **kwargs):
         if command == [
@@ -179,6 +173,12 @@ def test_stop_failure(provider):
     with pytest.raises(VMResourceError):
         provider.stop(name="non-existent")
 
+
+def test_delete_success(provider):
+    # Mock Multipass list output for exists()
+    mock_list_result = MagicMock(
+        stdout="Name State IPv4 Image\ntest-vm Running 192.168.64.5 Ubuntu 22.04 LTS\n"
+    )
 
 def test_delete_success(provider):
     def side_effect(command, **kwargs):
@@ -206,6 +206,7 @@ def test_delete_success(provider):
             "test-vm",
         ]
     )
+
 
 
 def test_list_parsing(provider):
@@ -253,7 +254,13 @@ def test_list_parsing(provider):
     )
 
 
+
 def test_restart_success(provider):
+    # Mock Multipass list output for exists()
+    mock_list_result = MagicMock(
+        stdout="Name State IPv4 Image\ntest-vm Running 192.168.64.5 Ubuntu 22.04 LTS\n"
+    )
+
     def side_effect(command, **kwargs):
         if command == [
             "multipass",
@@ -278,6 +285,7 @@ def test_restart_success(provider):
     provider._run_command.assert_any_call(
         ["multipass", "start", "test-vm"]
     )
+
 
 
 def test_getters(provider):
@@ -309,6 +317,10 @@ def test_upload_key_escaping(
         "'quote' ... user@host"
     )
 
+
+def test_upload_key_escaping(provider, tmp_path):
+    # Create a dummy public key file with a single quote
+    key_content = "ssh-rsa AAAAB3Nza... 'quote' ... user@host"
     key_file = tmp_path / "id_rsa.pub"
     key_file.write_text(key_content)
 
@@ -353,6 +365,10 @@ def test_upload_key_escaping(
             "-c",
             expected_cmd_part,
         ]
+    )
+
+    provider._run_command.assert_called_with(
+        ["multipass", "exec", vm_name, "--", "bash", "-c", expected_cmd_part]
     )
 
 

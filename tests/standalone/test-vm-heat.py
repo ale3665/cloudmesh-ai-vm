@@ -5,10 +5,10 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-import yaml
-import openstack
-from keystoneauth1.exceptions.connection import ConnectFailure
 
+import openstack
+import yaml
+from keystoneauth1.exceptions.connection import ConnectFailure
 
 HEAT_TEMPLATE = """
 heat_template_version: 2021-04-16
@@ -98,7 +98,9 @@ def get_connection(cloud_name: str) -> openstack.connection.Connection:
         sys.exit(f"❌ Failed to connect to cloud '{cloud_name}': {exc}")
 
 
-def check_heat_service_available(conn: openstack.connection.Connection, cloud_name: str):
+def check_heat_service_available(
+    conn: openstack.connection.Connection, cloud_name: str
+):
     """Verify that Heat is in the catalog AND its endpoint is actually responding."""
     if not conn.has_service("orchestration"):
         sys.exit(
@@ -118,7 +120,9 @@ def check_heat_service_available(conn: openstack.connection.Connection, cloud_na
         )
 
 
-def ensure_keypair(conn: openstack.connection.Connection, name: str, pub_key_path: Path) -> str:
+def ensure_keypair(
+    conn: openstack.connection.Connection, name: str, pub_key_path: Path
+) -> str:
     """Ensure keypair exists, creating it from pub_key_path if missing."""
     kp = conn.compute.find_keypair(name)
     if kp:
@@ -136,12 +140,16 @@ def ensure_keypair(conn: openstack.connection.Connection, name: str, pub_key_pat
     return kp.name
 
 
-def wait_for_stack_stages(conn: openstack.connection.Connection, stack, wait_seconds: int = 600):
+def wait_for_stack_stages(
+    conn: openstack.connection.Connection, stack, wait_seconds: int = 600
+):
     """
     Monitor Heat stack progression through its resource lifecycle stages.
     Heat uses a DAG to order dependencies (Port -> Server -> FloatingIP).
     """
-    print(f"⏳ Waiting for Heat stack '{stack.name}' to complete (up to {wait_seconds}s)...")
+    print(
+        f"⏳ Waiting for Heat stack '{stack.name}' to complete (up to {wait_seconds}s)..."
+    )
     start_time = time.time()
     seen_events = set()
 
@@ -170,7 +178,9 @@ def wait_for_stack_stages(conn: openstack.connection.Connection, stack, wait_sec
 
         time.sleep(5)
 
-    sys.exit(f"❌ Timeout waiting for Heat stack '{stack.name}' to reach CREATE_COMPLETE.")
+    sys.exit(
+        f"❌ Timeout waiting for Heat stack '{stack.name}' to reach CREATE_COMPLETE."
+    )
 
 
 def extract_stack_output(stack, output_key: str) -> str:
@@ -182,7 +192,13 @@ def extract_stack_output(stack, output_key: str) -> str:
     return None
 
 
-def test_ssh_connection(user: str, ip: str, priv_key_path: Path, command: str = "uname -a", timeout: int = 120) -> bool:
+def test_ssh_connection(
+    user: str,
+    ip: str,
+    priv_key_path: Path,
+    command: str = "uname -a",
+    timeout: int = 120,
+) -> bool:
     """Wait for SSH to become ready and execute a remote command."""
     print(f"\n🔐 Testing SSH login and running '{command}' on {user}@{ip}...")
     if not priv_key_path.is_file():
@@ -191,11 +207,16 @@ def test_ssh_connection(user: str, ip: str, priv_key_path: Path, command: str = 
 
     ssh_cmd = [
         "ssh",
-        "-i", str(priv_key_path),
-        "-o", "StrictHostKeyChecking=no",
-        "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "ConnectTimeout=5",
-        "-o", "BatchMode=yes",
+        "-i",
+        str(priv_key_path),
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "ConnectTimeout=5",
+        "-o",
+        "BatchMode=yes",
         f"{user}@{ip}",
         command,
     ]
@@ -220,21 +241,50 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Deploy a VM with a public IP using OpenStack Heat (Orchestration)."
     )
-    parser.add_argument("--cloud", default="jetstream", help="Cloud entry name in clouds.yaml")
-    parser.add_argument("--stack-name", default="gregor-heat-stack", help="Heat stack name")
+    parser.add_argument(
+        "--cloud", default="jetstream", help="Cloud entry name in clouds.yaml"
+    )
+    parser.add_argument(
+        "--stack-name", default="gregor-heat-stack", help="Heat stack name"
+    )
     parser.add_argument("--name", default="gregor-heat-vm", help="Name for the new VM")
     parser.add_argument("--image", default="Featured-Ubuntu22", help="Image name or ID")
     parser.add_argument("--flavor", default="m3.small", help="Flavor name or ID")
-    parser.add_argument("--network", default="auto_allocated_network", help="Private network name or ID")
+    parser.add_argument(
+        "--network", default="auto_allocated_network", help="Private network name or ID"
+    )
     parser.add_argument("--secgroup", default="default", help="Security group name/ID")
-    parser.add_argument("--keypair", default="gregor-tmp-key", help="Keypair name to create/use")
-    parser.add_argument("--keyfile", default=str(Path.home() / ".ssh/id_rsa.pub"), help="Public SSH key path")
-    parser.add_argument("--privkey", default=str(Path.home() / ".ssh/id_rsa"), help="Private SSH key path")
-    parser.add_argument("--command", default="uname -a", help="Command to run on the VM via SSH")
-    parser.add_argument("--ssh-timeout", type=int, default=120, help="Seconds to wait for SSH to become ready")
-    parser.add_argument("--user", default="ubuntu", help="Default SSH user for the OS image")
-    parser.add_argument("--ext-net", default="public", help="External network for floating IPs")
-    parser.add_argument("--wait", type=int, default=600, help="Seconds to wait for stack completion")
+    parser.add_argument(
+        "--keypair", default="gregor-tmp-key", help="Keypair name to create/use"
+    )
+    parser.add_argument(
+        "--keyfile",
+        default=str(Path.home() / ".ssh/id_rsa.pub"),
+        help="Public SSH key path",
+    )
+    parser.add_argument(
+        "--privkey",
+        default=str(Path.home() / ".ssh/id_rsa"),
+        help="Private SSH key path",
+    )
+    parser.add_argument(
+        "--command", default="uname -a", help="Command to run on the VM via SSH"
+    )
+    parser.add_argument(
+        "--ssh-timeout",
+        type=int,
+        default=120,
+        help="Seconds to wait for SSH to become ready",
+    )
+    parser.add_argument(
+        "--user", default="ubuntu", help="Default SSH user for the OS image"
+    )
+    parser.add_argument(
+        "--ext-net", default="public", help="External network for floating IPs"
+    )
+    parser.add_argument(
+        "--wait", type=int, default=600, help="Seconds to wait for stack completion"
+    )
     return parser.parse_args()
 
 

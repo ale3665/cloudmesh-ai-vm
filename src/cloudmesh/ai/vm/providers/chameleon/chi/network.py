@@ -838,7 +838,7 @@ def list_security_groups(name_filter=None) -> "list[SecurityGroup]":
 ###################
 
 
-class wizard(object):
+class wizard:
     """A collection of "wizard" functions.
 
     These utility functions are very opinionated but can reduce boilerplate.

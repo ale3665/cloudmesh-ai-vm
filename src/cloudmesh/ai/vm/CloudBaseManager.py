@@ -1,14 +1,16 @@
-from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
-from pathlib import Path
+import builtins
 import os
-import yaml
-from rich.text import Text
+from abc import ABC
+from pathlib import Path
 from typing import Any
+
+import yaml
 from rich import print as rprint
 from rich.pretty import Pretty
+from rich.text import Text
 
 from .base import BaseVMProvider
+
 
 class CloudBaseManager(BaseVMProvider, ABC):
     """
@@ -19,7 +21,7 @@ class CloudBaseManager(BaseVMProvider, ABC):
     def DEBUG(self, message: Any):
         if isinstance(message, dict):
             # Pretty print the dictionary with syntax highlighting
-            rprint(Pretty(message))  
+            rprint(Pretty(message))
         else:
             # Print non-dict messages in bold blue
             rprint(Text(str(message), style="bold blue"))
@@ -28,13 +30,15 @@ class CloudBaseManager(BaseVMProvider, ABC):
         super().__init__(config)
         self.console = console
 
-    def _get_default_vm(self, cloud_name: str = "chameleon") -> Optional[str]:
+    def _get_default_vm(self, cloud_name: str = "chameleon") -> str | None:
         """
         Attempts to retrieve the last used or default VM name for the specified cloud
         from cloudmesh configuration or a local state file.
         """
         # 1. Check if a local state file (e.g., ~/.config/cloudmesh/last_vm.<cloud_name>) exists
-        state_file = Path(os.path.expanduser(f"~/.config/cloudmesh/last_vm.{cloud_name}"))
+        state_file = Path(
+            os.path.expanduser(f"~/.config/cloudmesh/last_vm.{cloud_name}")
+        )
         if state_file.exists():
             vm_name = state_file.read_text().strip()
             if vm_name:
@@ -58,19 +62,21 @@ class CloudBaseManager(BaseVMProvider, ABC):
 
         return None
 
-    def get_cloud_config(self, cloud_name: str) -> Dict[str, Any]:
+    def get_cloud_config(self, cloud_name: str) -> dict[str, Any]:
         """
-        Helper to retrieve configuration for a specific cloud, 
+        Helper to retrieve configuration for a specific cloud,
         handling both dictionary, StateManager, and GlobalConfig object inputs.
         """
         # 1. Handle StateManager (YamlDB)
-        if hasattr(self.config, "get_cloud_config") and callable(getattr(self.config, "get_cloud_config")):
+        if hasattr(self.config, "get_cloud_config") and callable(
+            self.config.get_cloud_config
+        ):
             return self.config.get_cloud_config(cloud_name)
 
         # 2. Handle plain dictionary
         if isinstance(self.config, dict):
             return self.config.get("clouds", {}).get(cloud_name, {})
-        
+
         # 3. Handle GlobalConfig object (dataclass)
         clouds = getattr(self.config, "clouds", {})
         if isinstance(clouds, dict):
@@ -78,76 +84,86 @@ class CloudBaseManager(BaseVMProvider, ABC):
         else:
             # Fallback if clouds is not a dict
             return {}
-        
+
         # If the cloud_cfg is a dataclass (ProviderConfig), convert to dict
         if not isinstance(cloud_cfg, dict) and hasattr(cloud_cfg, "__dict__"):
             return cloud_cfg.__dict__
-        
+
         return cloud_cfg if isinstance(cloud_cfg, dict) else {}
 
     # We remove @abstractmethod from methods that are not mandatory for all providers.
     # BaseVMProvider already provides default implementations that raise ProviderFeatureNotSupported.
-    
-    def start(self, name: Optional[str] = None, flavor: Optional[str] = None, image: Optional[str] = None, **kwargs) -> str:
+
+    def start(
+        self,
+        name: str | None = None,
+        flavor: str | None = None,
+        image: str | None = None,
+        **kwargs,
+    ) -> str:
         """Starts a VM."""
         return super().start(name, flavor=flavor, image=image, **kwargs)
 
-    def stop(self, name: Optional[str] = None) -> bool:
+    def stop(self, name: str | None = None) -> bool:
         """Stops a VM."""
         return super().stop(name)
 
-    def delete(self, name: Optional[str] = None) -> bool:
+    def delete(self, name: str | None = None) -> bool:
         """Deletes a VM."""
         return super().delete(name)
 
-    def list(self) -> List[Dict[str, Any]]:
+    def list(self) -> list[dict[str, Any]]:
         """Lists all VMs managed by this provider."""
         return super().list()
 
-    def login(self, name: Optional[str] = None) -> bool:
+    def login(self, name: str | None = None) -> bool:
         """Logs into a VM."""
         return super().login(name)
 
-    def suspend(self, name: Optional[str] = None) -> bool:
+    def suspend(self, name: str | None = None) -> bool:
         """Suspends a VM."""
         return super().suspend(name)
 
-    def shelve(self, name: Optional[str] = None) -> bool:
+    def shelve(self, name: str | None = None) -> bool:
         """Shelves a VM."""
         return super().shelve(name)
 
-    def unshelve(self, name: Optional[str] = None) -> bool:
+    def unshelve(self, name: str | None = None) -> bool:
         """Unshelves a VM."""
         return super().unshelve(name)
 
-    def restart(self, name: Optional[str] = None) -> bool:
+    def restart(self, name: str | None = None) -> bool:
         """Restarts a VM."""
         return super().restart(name)
 
-    def reset(self, name: Optional[str] = None) -> bool:
+    def reset(self, name: str | None = None) -> bool:
         """Resets a VM or the provider service."""
         return super().reset(name)
 
-    def info(self, name: Optional[str] = None, kind: str = "vm") -> Dict[str, Any]:
-            """
-            Gets detailed information about a specific VM.
-            If name is missing, attempts to read it from the last_vm state file 
-            or cloudmesh configuration.
-            """
+    def info(self, name: str | None = None, kind: str = "vm") -> dict[str, Any]:
+        """
+        Gets detailed information about a specific VM.
+        If name is missing, attempts to read it from the last_vm state file
+        or cloudmesh configuration.
+        """
+        if not name:
+            cloud_name = getattr(self, "cloud_name", "chameleon")
+            name = self._get_default_vm(cloud_name)
+
             if not name:
-                cloud_name = getattr(self, "cloud_name", "chameleon")
-                name = self._get_default_vm(cloud_name)
-                
-                if not name:
-                    self.print(f"[red]Error: Missing argument 'NAME' and no default VM found for cloud '{cloud_name}'.[/red]")
-                    return {}
-                
-                self.print(f"[yellow]No VM name provided. Using default/last VM: {name}[/yellow]")
+                self.print(
+                    f"[red]Error: Missing argument 'NAME' and no default VM found for cloud '{cloud_name}'.[/red]"
+                )
+                return {}
 
-            # Delegate to the underlying provider implementation (or super class)
-            return super().info(name, kind=kind)
+            self.print(
+                f"[yellow]No VM name provided. Using default/last VM: {name}[/yellow]"
+            )
 
-    def get_security_groups(self) -> List[Dict[str, Any]]:
+        # Delegate to the underlying provider implementation (or super class)
+        return super().info(name, kind=kind)
+
+    def get_security_groups(self) -> builtins.list[dict[str, Any]]:
         """Lists available security groups for the current cloud."""
         return super().get_security_groups()
 
@@ -155,17 +171,18 @@ class CloudBaseManager(BaseVMProvider, ABC):
         """Uploads a public key to the cloud provider."""
         return super().upload_key(key_path, key_name)
 
-    def delete_key(self, key_name: str, vm_name: Optional[str] = None) -> bool:
+    def delete_key(self, key_name: str, vm_name: str | None = None) -> bool:
         """Deletes a public key from the cloud provider."""
         return super().delete_key(key_name, vm_name=vm_name)
 
-    def get_cost(self, **kwargs) -> Optional[Any]:
+    def get_cost(self, **kwargs) -> Any | None:
         """Returns the cost information for the provider."""
         return None
 
-    def validate_config(self) -> Dict[str, List[str]]:
+    def validate_config(self) -> dict[str, builtins.list[str]]:
         """Validates that the cloud configuration has all required fields."""
         return {}
+
     def _get_current_status(self, name: str) -> str:
         """Returns the current status of the VM. Must be implemented by child classes."""
         raise ProviderFeatureNotSupported(self.cloud_name, "_get_current_status")
@@ -174,12 +191,15 @@ class CloudBaseManager(BaseVMProvider, ABC):
         """Normalizes the status string for comparison."""
         return status.lower() if status else ""
 
-    def wait_for_status(self, name: str, target_status: str, timeout: int = 300) -> bool:
+    def wait_for_status(
+        self, name: str, target_status: str, timeout: int = 300
+    ) -> bool:
         """
         Polls the VM status until it matches the target_status or the timeout is reached.
         Returns True if the status was reached, False otherwise.
         """
         import time
+
         from cloudmesh.ai.vm.logger import logger
 
         logger.info(f"Waiting for VM {name} to reach status {target_status}...")
@@ -199,9 +219,10 @@ class CloudBaseManager(BaseVMProvider, ABC):
 
             time.sleep(5)
 
-        logger.error(f"Timeout reached waiting for VM {name} to reach status {target_status}.")
+        logger.error(
+            f"Timeout reached waiting for VM {name} to reach status {target_status}."
+        )
         return False
-
 
     def add_security_group_rule(
         self,
@@ -212,26 +233,29 @@ class CloudBaseManager(BaseVMProvider, ABC):
         direction: str = "ingress",
     ) -> str:
         """Adds a firewall rule to a security group."""
-        return super().add_security_group_rule(
-            sg_name, protocol, port, cidr, direction
-        )
+        return super().add_security_group_rule(sg_name, protocol, port, cidr, direction)
 
-    def _execute_ssh_command(self, ip: str, user: str, key_path: str, command: str) -> str:
+    def _execute_ssh_command(
+        self, ip: str, user: str, key_path: str, command: str
+    ) -> str:
         """
         Generic SSH command executor.
         """
-        import subprocess
         import os
+        import subprocess
 
         key_path = os.path.expanduser(key_path)
 
         ssh_cmd = [
             "ssh",
-            "-i", key_path,
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "UserKnownHostsFile=/dev/null",
+            "-i",
+            key_path,
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
             f"{user}@{ip}",
-            command
+            command,
         ]
 
         try:
@@ -258,9 +282,10 @@ class CloudBaseManager(BaseVMProvider, ABC):
         else:
             print(text, **kwargs)
 
-    def _run_interactive(self, command: List[str]):
+    def _run_interactive(self, command: builtins.list[str]):
         """Runs a command directly connected to the terminal for smooth animations."""
         import subprocess
+
         try:
             return subprocess.run(command, capture_output=False, check=True)
         except subprocess.CalledProcessError as e:

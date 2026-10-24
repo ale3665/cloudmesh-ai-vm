@@ -1,17 +1,18 @@
-import os
-import yaml
-import pytest
-import uuid
-import time
 import subprocess
-from cloudmesh.ai.vm.state_manager import StateManager
-from cloudmesh.ai.vm.factory import factory
-from src.cloudmesh.ai.vm.openstack.OpenstackManager import OpenstackManager
+import uuid
+
+import pytest
+import yaml
 from cloudmesh.ai.common.stopwatch import StopWatch
+
+from cloudmesh.ai.vm.factory import factory
+from cloudmesh.ai.vm.state_manager import StateManager
+from src.cloudmesh.ai.vm.openstack.OpenstackManager import OpenstackManager
 from tests.smoke.benchmark_helper import save_benchmark
 
 # Register the provider in the factory for the test
 factory.register("jetstream", OpenstackManager)
+
 
 @pytest.fixture
 def temp_config(tmp_path):
@@ -27,13 +28,14 @@ def temp_config(tmp_path):
                 "image": "ubuntu-22.04",
                 "flavor": "m1.small",
             }
-        }
+        },
     }
 
     with open(config_file, "w") as f:
         yaml.dump(config_data, f)
 
     return str(config_file)
+
 
 @pytest.fixture
 def ssh_key(tmp_path):
@@ -44,10 +46,11 @@ def ssh_key(tmp_path):
     subprocess.run(
         ["ssh-keygen", "-t", "rsa", "-b", "2048", "-f", str(key_path), "-N", ""],
         check=True,
-        capture_output=True
+        capture_output=True,
     )
 
     return str(key_path), str(pub_key_path)
+
 
 def test_jetstream_smoke(temp_config, ssh_key):
     """
@@ -111,8 +114,12 @@ def test_jetstream_smoke(temp_config, ssh_key):
         with StopWatch.timer("jetstream_connectivity"):
             print(f"Checking connectivity for VM {vm_name}...")
             user = cloud_config.get("user", "ubuntu")
-            hostname = provider._execute_ssh_command(fip, user, priv_key_path, "hostname")
-            assert "Error" not in hostname, f"Connectivity check failed for {vm_name}: {hostname}"
+            hostname = provider._execute_ssh_command(
+                fip, user, priv_key_path, "hostname"
+            )
+            assert "Error" not in hostname, (
+                f"Connectivity check failed for {vm_name}: {hostname}"
+            )
             print(f"Connectivity check successful. Hostname: {hostname}")
 
         # SSH Key Management
@@ -125,10 +132,12 @@ def test_jetstream_smoke(temp_config, ssh_key):
             with open(pub_key_path, "r") as f:
                 pub_key_content = f.read().strip()
 
-            escaped_key = pub_key_content.replace("'", "'\''")
+            escaped_key = pub_key_content.replace("'", "'''")
             verify_cmd = f"grep -q '{escaped_key}' ~/.ssh/authorized_keys"
             result = provider._execute_ssh_command(fip, user, priv_key_path, verify_cmd)
-            assert "SSH Error" not in result, f"SSH key was not found in {vm_name}'s authorized_keys"
+            assert "SSH Error" not in result, (
+                f"SSH key was not found in {vm_name}'s authorized_keys"
+            )
             print("SSH key verified successfully.")
 
         with StopWatch.timer("jetstream_delete_key"):
@@ -138,8 +147,12 @@ def test_jetstream_smoke(temp_config, ssh_key):
         with StopWatch.timer("jetstream_verify_key_deleted"):
             print("Verifying SSH key is removed...")
             verify_cmd_del = f"grep -q '{escaped_key}' ~/.ssh/authorized_keys"
-            result_del = provider._execute_ssh_command(fip, user, priv_key_path, verify_cmd_del)
-            assert "SSH Error" in result_del, f"SSH key should have been removed from {vm_name}"
+            result_del = provider._execute_ssh_command(
+                fip, user, priv_key_path, verify_cmd_del
+            )
+            assert "SSH Error" in result_del, (
+                f"SSH key should have been removed from {vm_name}"
+            )
             print("SSH key removal verified.")
 
         # Test info

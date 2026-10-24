@@ -1,7 +1,13 @@
 import click
-from cloudmesh.ai.command._shared.context import console, get_active_provider, vm_options
+
+from cloudmesh.ai.command._shared.context import (
+    console,
+    get_active_provider,
+    vm_options,
+)
 from cloudmesh.ai.command._shared.exceptions import handle_errors
 from cloudmesh.ai.command._shared.ui import render_table
+
 
 @click.command()
 @click.pass_context
@@ -10,10 +16,22 @@ from cloudmesh.ai.command._shared.ui import render_table
 def flavor(ctx: click.Context, **kwargs):
     """List available VM flavor."""
     provider = get_active_provider(ctx)
-    flv = provider.get_flavors() # Adjusted to use get_flavors()
+    flv = provider.get_flavors()  # Adjusted to use get_flavors()
     if flv:
-        render_table("Flavors", ["Name", "CPU", "RAM"], [[f.get("name", "Unknown"), f.get("cpu", "Unknown"), f.get("ram", "Unknown")] for f in flv])
+        render_table(
+            "Flavors",
+            ["Name", "CPU", "RAM"],
+            [
+                [
+                    f.get("name", "Unknown"),
+                    f.get("cpu", "Unknown"),
+                    f.get("ram", "Unknown"),
+                ]
+                for f in flv
+            ],
+        )
     else:
         console.print("No flavors found.")
+
 
 cmd = flavor

@@ -21,6 +21,7 @@ Instead of a `Makefile`, you create a `tasks.py` file:
 ```python
 from invoke import task
 
+
 @task
 def vm(c):
     """Launch and configure the Multipass VM"""
@@ -28,16 +29,20 @@ def vm(c):
     c.run("multipass launch --name mkdocs-vm || echo 'VM already exists'")
     c.run("ansible-playbook deploy_docs.yml")
 
+
 @task
 def test(c):
     """Verify the web service is responding"""
-    ip = c.run("multipass info mkdocs-vm | grep IPv4 | awk '{print $2}'", hide=True).stdout.strip()
+    ip = c.run(
+        "multipass info mkdocs-vm | grep IPv4 | awk '{print $2}'", hide=True
+    ).stdout.strip()
     print(f"🧪 Testing service at http://{ip}:8000...")
     result = c.run(f"curl -s http://{ip}:8000", hide=True)
     if "Welcome" in result.stdout:
         print("✅ Test Passed")
     else:
         print("❌ Test Failed")
+
 
 @task
 def clean(c):

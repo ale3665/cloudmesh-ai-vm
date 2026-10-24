@@ -50,7 +50,6 @@ try:
     print(f"Public key name: {key_name}")
     print()
 
-
     key = keypair.Keypair(keypair_public_key=key_filename, key_name=key_name)
 
     print(f"✅ Keypair {key.key_name} is ready")
@@ -90,7 +89,7 @@ for i in range(10):
         break
     except chi.exception.ResourceError as e:
         if "None of the ports can route" in str(e):
-            print(f"  Port not ready yet, retrying in 3s... ({i+1}/10)")
+            print(f"  Port not ready yet, retrying in 3s... ({i + 1}/10)")
             time.sleep(3)
         else:
             raise e
@@ -117,5 +116,5 @@ else:
 s.add_security_group(sg.id)
 
 # 7. PRINT SSH CONNECTION DETAILS
-print(f"\nVM is ready! You can SSH in using:")
+print("\nVM is ready! You can SSH in using:")
 print(f"ssh cc@{fip_addr}")

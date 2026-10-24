@@ -11,7 +11,8 @@ import time
 import openstack
 
 # Initialize connection (reads from environment variables or ~/.config/openstack/clouds.yaml)
-conn = openstack.connect(cloud="openstack") 
+conn = openstack.connect(cloud="openstack")
+
 
 def create_ssh_vm():
     # 1. Configuration parameters - Adjust these to match your environment
@@ -30,7 +31,9 @@ def create_ssh_vm():
     network = conn.network.find_network(NETWORK_NAME)
 
     if not all([image, flavor, network]):
-        raise ValueError("One or more resources (Image, Flavor, Network) could not be found.")
+        raise ValueError(
+            "One or more resources (Image, Flavor, Network) could not be found."
+        )
 
     # 2. Upload SSH Key Pair
     print(f"Ensuring key pair '{KEY_NAME}' exists...")
@@ -81,9 +84,12 @@ def create_ssh_vm():
     conn.network.update_ip(floating_ip, port_id=server_port.id)
 
     print("\n" + "=" * 50)
-    print(f"VM Successfully Created!\nInstance Name : {server.name}\nFloating IP   : {floating_ip.floating_ip_address}")
+    print(
+        f"VM Successfully Created!\nInstance Name : {server.name}\nFloating IP   : {floating_ip.floating_ip_address}"
+    )
     print(f"\nLog in via: ssh ubuntu@{floating_ip.floating_ip_address}")
     print("=" * 50)
+
 
 if __name__ == "__main__":
     create_ssh_vm()
@@ -140,43 +146,58 @@ To avoid writing provider-specific code, you can implement an abstract base clas
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
+
 class AbstractCloudManager(ABC):
     """Abstract Base Class for managing Cloud Instances."""
 
     @property
     @abstractmethod
-    def region(self) -> str: pass
+    def region(self) -> str:
+        pass
 
     @region.setter
     @abstractmethod
-    def region(self, value: str) -> None: pass
+    def region(self, value: str) -> None:
+        pass
 
     @property
     @abstractmethod
-    def image(self) -> Optional[str]: pass
+    def image(self) -> Optional[str]:
+        pass
 
     @abstractmethod
-    def set(self, cloud_name: Optional[str] = None, yaml_path: Optional[str] = None, 
-            image: Optional[str] = None, network: Optional[str] = None, 
-            key_name: Optional[str] = None, key_path: Optional[str] = None, 
-            region: Optional[str] = None) -> None:
+    def set(
+        self,
+        cloud_name: Optional[str] = None,
+        yaml_path: Optional[str] = None,
+        image: Optional[str] = None,
+        network: Optional[str] = None,
+        key_name: Optional[str] = None,
+        key_path: Optional[str] = None,
+        region: Optional[str] = None,
+    ) -> None:
         """Load configuration and initialize connection."""
         pass
 
     @abstractmethod
-    def boot(self, name: str, flavor: str = "m1.small") -> Dict[str, Any]: pass
+    def boot(self, name: str, flavor: str = "m1.small") -> Dict[str, Any]:
+        pass
 
     @abstractmethod
-    def stop(self, instance_id: str) -> bool: pass
+    def stop(self, instance_id: str) -> bool:
+        pass
 
     @abstractmethod
-    def start(self, instance_id: str) -> bool: pass
+    def start(self, instance_id: str) -> bool:
+        pass
 
     @abstractmethod
-    def destroy(self, instance_id: str) -> bool: pass
+    def destroy(self, instance_id: str) -> bool:
+        pass
 
     @abstractmethod
-    def info(self, instance_id: str) -> Dict[str, Any]: pass
+    def info(self, instance_id: str) -> Dict[str, Any]:
+        pass
 ```
 
 ### Concrete OpenStack Implementation
@@ -187,6 +208,7 @@ The `OpenStackManager` implements the abstract interface using the `openstacksdk
 import openstack
 from openstack.config import loader
 from typing import Any, Dict, Optional
+
 
 class OpenStackManager(AbstractCloudManager):
     def __init__(self, cloud_name: Optional[str] = None):
@@ -199,38 +221,59 @@ class OpenStackManager(AbstractCloudManager):
             self.set(cloud_name=cloud_name)
 
     @property
-    def region(self) -> str: return self._region or ""
+    def region(self) -> str:
+        return self._region or ""
 
     @region.setter
     def region(self, value: str) -> None:
         self._region = value
         if self.conn:
-            self.conn = openstack.connect(cloud=self.conn.config.name, region_name=value)
+            self.conn = openstack.connect(
+                cloud=self.conn.config.name, region_name=value
+            )
 
     @property
-    def image(self) -> Optional[str]: return self._image_id
+    def image(self) -> Optional[str]:
+        return self._image_id
 
-    def set(self, cloud_name=None, yaml_path=None, image=None, network=None, 
-            key_name=None, key_path=None, region=None) -> None:
-        config_loader = loader.OpenStackConfig(config_files=[yaml_path] if yaml_path else None)
+    def set(
+        self,
+        cloud_name=None,
+        yaml_path=None,
+        image=None,
+        network=None,
+        key_name=None,
+        key_path=None,
+        region=None,
+    ) -> None:
+        config_loader = loader.OpenStackConfig(
+            config_files=[yaml_path] if yaml_path else None
+        )
         target_cloud = cloud_name or config_loader.get_one_cloud().name
-        cloud_region = region or config_loader.get_one_cloud(cloud=target_cloud).get_region_name()
-        
+        cloud_region = (
+            region or config_loader.get_one_cloud(cloud=target_cloud).get_region_name()
+        )
+
         self.conn = openstack.connect(cloud=target_cloud, region_name=cloud_region)
         self._region = self.conn.config.region_name
 
-        if image: self.set_image(image)
-        if network: self.set_network(network)
-        if key_name: self.set_key(key_name, public_key_path=key_path)
+        if image:
+            self.set_image(image)
+        if network:
+            self.set_network(network)
+        if key_name:
+            self.set_key(key_name, public_key_path=key_path)
 
     def set_image(self, image_name_or_id: str) -> None:
         img = self.conn.image.find_image(image_name_or_id)
-        if not img: raise ValueError(f"Image {image_name_or_id} not found.")
+        if not img:
+            raise ValueError(f"Image {image_name_or_id} not found.")
         self._image_id = img.id
 
     def set_network(self, network_name_or_id: str) -> None:
         net = self.conn.network.find_network(network_name_or_id)
-        if not net: raise ValueError(f"Network {network_name_or_id} not found.")
+        if not net:
+            raise ValueError(f"Network {network_name_or_id} not found.")
         self.network_id = net.id
 
     def set_key(self, key_name: str, public_key_path: Optional[str] = None) -> None:
@@ -244,11 +287,19 @@ class OpenStackManager(AbstractCloudManager):
     def boot(self, name: str, flavor: str = "m1.small") -> Dict[str, Any]:
         flv = self.conn.compute.find_flavor(flavor)
         server = self.conn.compute.create_server(
-            name=name, image_id=self._image_id, flavor_id=flv.id,
-            networks=[{"uuid": self.network_id}], key_name=self.key_name,
+            name=name,
+            image_id=self._image_id,
+            flavor_id=flv.id,
+            networks=[{"uuid": self.network_id}],
+            key_name=self.key_name,
         )
         server = self.conn.compute.wait_for_server(server, timeout=300)
-        return {"id": server.id, "name": server.name, "status": server.status, "addresses": server.addresses}
+        return {
+            "id": server.id,
+            "name": server.name,
+            "status": server.status,
+            "addresses": server.addresses,
+        }
 
     def stop(self, instance_id: str) -> bool:
         server = self.conn.compute.find_server(instance_id)
@@ -273,7 +324,16 @@ class OpenStackManager(AbstractCloudManager):
 
     def info(self, instance_id: str) -> Dict[str, Any]:
         server = self.conn.compute.find_server(instance_id)
-        return {"id": server.id, "name": server.name, "status": server.status, "addresses": server.addresses} if server else {}
+        return (
+            {
+                "id": server.id,
+                "name": server.name,
+                "status": server.status,
+                "addresses": server.addresses,
+            }
+            if server
+            else {}
+        )
 ```
 
 ## Cloud Management CLI (CMC)

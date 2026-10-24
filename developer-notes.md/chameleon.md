@@ -49,9 +49,10 @@ from docopt import docopt
 from chi import context, hardware
 from chi.clients import blazar
 
+
 def main():
     args = docopt(__doc__)
-    
+
     site = args["--site"]
     project = args["--project"]
     resource_type = args["--resource-type"].lower()
@@ -72,29 +73,38 @@ def main():
     end_time = start_time + duration
 
     print(f"Site: {site} | Project: {project}")
-    print(f"Checking availability for [{resource_type.upper()}] from {start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')} ({duration_hours}h duration)\n")
+    print(
+        f"Checking availability for [{resource_type.upper()}] from {start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')} ({duration_hours}h duration)\n"
+    )
 
     blazar_client = blazar()
 
     if resource_type == "nodes":
         items = hardware.get_nodes(all_sites=False)
         types = sorted(list(set(n.type for n in items)))
-        
+
         print(f"{'Node Type':<30} | {'Total':<8} | {'Available'}")
         print("-" * 52)
-        
+
         for nt in types:
             matching = [n for n in items if n.type == nt]
             total_count = len(matching)
             available_count = 0
-            
+
             for node in matching:
-                host_id = next((h["id"] for h in blazar_client.host.list() if h.get("uid") == node.uid), None)
+                host_id = next(
+                    (
+                        h["id"]
+                        for h in blazar_client.host.list()
+                        if h.get("uid") == node.uid
+                    ),
+                    None,
+                )
                 if not host_id:
                     continue
                 allocation = blazar_client.host.get_allocation(host_id)
                 reservations = allocation.get("reservations", []) if allocation else []
-                
+
                 is_free = True
                 for res in reservations:
                     res_start = datetime.strptime(res["start_date"], "%Y-%m-%d %H:%M")
@@ -110,25 +120,28 @@ def main():
     elif resource_type == "devices":
         items = hardware.get_devices()
         types = sorted(list(set(d.device_type for d in items)))
-        
+
         print(f"{'Device Type':<30} | {'Total':<8} | {'Available'}")
         print("-" * 52)
-        
+
         for dt in types:
             matching = [d for d in items if d.device_type == dt]
             total_count = len(matching)
             available_count = 0
-            
+
             for dev in matching:
                 _, next_slot = dev.next_free_timeslot(minimum_hours=int(duration_hours))
                 if next_slot and next_slot <= end_time:
                     available_count += 1
                 elif not next_slot:
                     available_count += 1
-                    
+
             print(f"{dt:<30} | {total_count:<8} | {available_count}")
     else:
-        print(f"Unknown resource type '{resource_type}'. Please specify 'nodes' or 'devices'.")
+        print(
+            f"Unknown resource type '{resource_type}'. Please specify 'nodes' or 'devices'."
+        )
+
 
 if __name__ == "__main__":
     main()
@@ -169,14 +182,14 @@ lease_name = f"{username}-ubuntu26-lease"
 server_name = f"{username}-ubuntu26-server"
 
 # Specify the target node type (e.g., compute_cascadelake_r)
-node_type = "compute_cascadelake_r" 
+node_type = "compute_cascadelake_r"
 
 print(f"Creating lease '{lease_name}' for node type '{node_type}'...")
 
 # 3. Create and submit the reservation lease
 l = lease.Lease(
     name=lease_name,
-    duration=timedelta(hours=2)  # Adjust duration as needed
+    duration=timedelta(hours=2),  # Adjust duration as needed
 )
 l.add_node_reservation(node_type=node_type, amount=1)
 l.add_fip_reservation(amount=1)  # Reserve a floating IP for external access

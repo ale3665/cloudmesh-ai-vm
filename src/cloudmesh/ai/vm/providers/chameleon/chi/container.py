@@ -17,7 +17,6 @@ import logging
 import os
 import tarfile
 import time
-from typing import Dict, List, Optional, Tuple
 from warnings import warn
 
 from IPython.display import HTML, display
@@ -71,15 +70,15 @@ class Container:
         self,
         name: str,
         image_ref: str,
-        exposed_ports: List[str] = None,
+        exposed_ports: list[str] = None,
         reservation_id: str = None,
         start: bool = True,
         start_timeout: int = 0,
         runtime: str = None,
-        command: List[str] = None,
+        command: list[str] = None,
         workdir: str = None,
-        environment: Dict[str, str] = {},
-        device_profiles: List[str] = [],
+        environment: dict[str, str] = {},
+        device_profiles: list[str] = [],
     ):
 
         # check if values are not the defaults.
@@ -120,7 +119,7 @@ class Container:
 
     @property
     def status(self):
-        return getattr(self.zun_container, "status")
+        return self.zun_container.status
 
     def submit(
         self,
@@ -318,7 +317,7 @@ class Container:
         html_table = html_table.format(rows=rows)
         display(HTML(html_table))
 
-    def execute(self, command: str) -> Tuple[str, str]:
+    def execute(self, command: str) -> tuple[str, str]:
         """
         Executes a command inside the container and returns the output and exit code.
 
@@ -463,7 +462,7 @@ def create_container(
     return container
 
 
-def list_containers() -> List[Container]:
+def list_containers() -> list[Container]:
     """
     Retrieve a list of containers.
 
@@ -476,7 +475,7 @@ def list_containers() -> List[Container]:
     return zun().containers.list()
 
 
-def get_container(name: str) -> Optional[Container]:
+def get_container(name: str) -> Container | None:
     """
     Retrieve a container by name.
 
@@ -643,10 +642,8 @@ def _wait_for_status(
         time.sleep(5)
         if time.perf_counter() - start_time >= timeout:
             raise TimeoutError(
-                (
-                    f"Waited too long for the container {container_ref} to be "
-                    f"{status.lower()}."
-                )
+                f"Waited too long for the container {container_ref} to be "
+                f"{status.lower()}."
             )
 
 

@@ -1,24 +1,27 @@
-import os
-import subprocess
-from typing import Optional
 import json
-from io import StringIO
+import os
+import platform  # these need to be removes and sysinfo needs to be used
+import subprocess
+import sys  # these need to be removes and sysinfo needs to be used
 from contextlib import redirect_stdout
+from datetime import datetime
+from io import StringIO
+
 import yaml
 from cloudmesh.ai.common.stopwatch import StopWatch
 from cloudmesh.ai.common.sys import systeminfo
-from typing import Optional
-
-import platform # these need to be removes and sysinfo needs to be used
-import sys      # these need to be removes and sysinfo needs to be used
-from datetime import datetime
 
 # Git info
 
+
 def get_git_info():
     try:
-        branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip()
-        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+        branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True
+        ).strip()
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True
+        ).strip()
         git_info = f"Branch: {branch}\nCommit: {commit}"
         git_data = {"branch": branch, "commit": commit}
     except Exception:
@@ -26,7 +29,8 @@ def get_git_info():
         git_data = {}
     return git_info, git_data
 
-def get_results_username(config_path: Optional[str] = None) -> str:
+
+def get_results_username(config_path: str | None = None) -> str:
     """
     Determines the username for result filenames.
     Only uses ~/.config/cloudmesh/clouds.yaml.
@@ -52,18 +56,14 @@ def get_results_username(config_path: Optional[str] = None) -> str:
     )
 
 
-
-def create_benchmark_payload(benchmark_name: str, 
-                             user: str = "gregor") -> dict:
-
+def create_benchmark_payload(benchmark_name: str, user: str = "gregor") -> dict:
 
     # Git info
     git_info, git_data = get_git_info()
 
-
     # Example usage:
-    # payload = create_benchmark_payload("lima-smoke", 
-    #                                     branch="main", 
+    # payload = create_benchmark_payload("lima-smoke",
+    #                                     branch="main",
     #                                     commit="39ba1872...")
     # print(json.dumps(payload, indent=2))
 
@@ -86,11 +86,15 @@ def create_benchmark_payload(benchmark_name: str,
             "machine": platform.machine(),
             "processor": platform.processor(),
             "node": platform.node(),
-            "platform_version": platform.mac_ver()[0] if platform.system() == "Darwin" else platform.version(),
+            "platform_version": platform.mac_ver()[0]
+            if platform.system() == "Darwin"
+            else platform.version(),
             "sys_platform": sys.platform,
             "python": sys.version,
             "python_version": platform.python_version(),
-            "python_pip": getattr(sys, "pypy_version_info", None),  # Or fallback pip version check if needed
+            "python_pip": getattr(
+                sys, "pypy_version_info", None
+            ),  # Or fallback pip version check if needed
         },
     }
 
@@ -102,21 +106,25 @@ def create_benchmark_payload(benchmark_name: str,
         # Gather the individual pieces from the public API
         status = StopWatch.get_status(name)
         # Turn the internal boolean/None into a readable string (matches the output format of benchmark())
-        status_str = "ok" if status is True else ("failed" if status is False else "unknown")
+        status_str = (
+            "ok" if status is True else ("failed" if status is False else "unknown")
+        )
         # Elapsed time for the *last* start/stop pair
-        elapsed = StopWatch.get(name)               # may be float or "undefined"
+        elapsed = StopWatch.get(name)  # may be float or "undefined"
         # Total summed time (if the timer was started/stopped multiple times)
-        total = StopWatch.sum(name)                 # may be float or "undefined"
+        total = StopWatch.sum(name)  # may be float or "undefined"
         # Optional message attached with StopWatch.message()
         msg = StopWatch.get_message(name)
 
-        timers_list.append({
-            "name": name,
-            "status": status_str,
-            "time": float(elapsed) if isinstance(elapsed, float) else None,
-            "sum": float(total) if isinstance(total, float) else None,
-            "msg": msg,
-        })
+        timers_list.append(
+            {
+                "name": name,
+                "status": status_str,
+                "time": float(elapsed) if isinstance(elapsed, float) else None,
+                "sum": float(total) if isinstance(total, float) else None,
+                "msg": msg,
+            }
+        )
 
     # 4. Construct final root dictionary
     payload = {
@@ -142,6 +150,7 @@ def save_benchmark(tag, config_path):
     with redirect_stdout(f):
         # Call systeminfo before benchmark and set user=results_username
         import yaml
+
         print(yaml.dump(systeminfo(user=username), default_flow_style=False))
         # Call benchmark without a tag to collect all recorded timers for this session
         StopWatch.benchmark(sysinfo=False)
@@ -157,10 +166,11 @@ def save_benchmark(tag, config_path):
     date_short = now.strftime("%Y-%m-%d")
     time_short = now.strftime("%H-%M")
 
-
     # 3. Write to file
     # Ensure results are saved to the project root's results/smoke directory
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    base_dir = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
     results_dir = os.path.join(base_dir, "results", "smoke")
     os.makedirs(results_dir, exist_ok=True)
 
@@ -190,13 +200,9 @@ def save_benchmark(tag, config_path):
     json_filename = f"{filename_base}.json"
     json_file_path = os.path.join(results_dir, json_filename)
 
-    results_data = create_benchmark_payload(
-        benchmark_name=tag, 
-        user=username)
-
+    results_data = create_benchmark_payload(benchmark_name=tag, user=username)
 
     with open(json_file_path, "w") as jf:
         json.dump(results_data, jf, indent=4)
 
     print(f"Benchmark saved to {txt_file_path} and {json_file_path}")
-

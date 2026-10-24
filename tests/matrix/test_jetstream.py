@@ -1,6 +1,6 @@
-import pytest
 from cloudmesh.ai.vm.openstack.JetstreamManager import JetstreamManager
 from tests.matrix.base import MatrixTestBase
+
 
 class TestJetstreamMatrix(MatrixTestBase):
     def test_capabilities(self):

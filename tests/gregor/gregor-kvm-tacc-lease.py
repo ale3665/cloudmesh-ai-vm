@@ -4,20 +4,25 @@ import time
 
 # Set OS_CLOUD early to ensure all libraries pick it up
 os.environ["OS_CLOUD"] = "chameleon"
-os.environ["OS_CLOUD_CONFIG_FILE"] = os.path.expanduser("~/.config/openstack/clouds.yaml")
+os.environ["OS_CLOUD_CONFIG_FILE"] = os.path.expanduser(
+    "~/.config/openstack/clouds.yaml"
+)
+
+import sys
+import traceback
+import uuid
 
 import chi
-from chi import context, lease, server, network, keypair
-import sys
-import uuid
-import traceback
 import openstack
 from blazarclient.v1.client import Client
+from chi import context, keypair, lease, network, server
+
 
 def banner(msg):
-    print("#",  "=" * 60)
+    print("#", "=" * 60)
     print("#", msg)
     print("#", "=" * 60)
+
 
 # 1. INITIALIZE CONTEXT OUTSIDE JUPYTER
 context.version = "1.0"
@@ -33,9 +38,11 @@ chi.context.session = lambda: conn.session
 
 # Patch Blazar specifically to fix the 'identity/token/id' None error
 try:
-    blazar_url = conn.catalog.get_endpoint('blazar', interface='public')
+    blazar_url = conn.catalog.get_endpoint("blazar", interface="public")
+
     def patched_blazar():
         return Client(blazar_url=blazar_url, session=conn.session)
+
     chi.lease.blazar = patched_blazar
     print("✅ Session and Blazar monkey-patched successfully")
 except Exception as e:
@@ -93,7 +100,7 @@ s = server.Server(
     name=server_name,
     image_name=image_name,
     flavor_name=l.get_reserved_flavors()[0].name,
-    key_name=key.key_name
+    key_name=key.key_name,
 )
 s.submit(idempotent=True, show="text")
 
@@ -110,12 +117,14 @@ for i in range(10):
         break
     except chi.exception.ResourceError as e:
         if "None of the ports can route" in str(e):
-            print(f"  Port not ready yet, retrying in 3s... ({i+1}/10)")
+            print(f"  Port not ready yet, retrying in 3s... ({i + 1}/10)")
             time.sleep(3)
         else:
             raise e
 else:
-    raise chi.exception.ResourceError("Timed out waiting for network ports to route Floating IP")
+    raise chi.exception.ResourceError(
+        "Timed out waiting for network ports to route Floating IP"
+    )
 
 s.refresh()
 
@@ -125,10 +134,9 @@ sg_list = network.list_security_groups(name_filter="allow-ssh")
 if sg_list:
     sg = sg_list[0]
 else:
-    sg = network.SecurityGroup({
-        "name": "allow-ssh",
-        "description": "Enable SSH traffic on TCP port 22"
-    })
+    sg = network.SecurityGroup(
+        {"name": "allow-ssh", "description": "Enable SSH traffic on TCP port 22"}
+    )
     sg.add_rule("ingress", "tcp", 22)
     sg.submit()
 
@@ -136,5 +144,5 @@ else:
 s.add_security_group(sg.id)
 
 # 6. Print the final IP address to use for SSHing
-print(f"\nVM is ready! You can SSH in using:")
+print("\nVM is ready! You can SSH in using:")
 print(f"ssh cc@{fip_addr}")

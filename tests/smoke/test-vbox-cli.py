@@ -1,14 +1,18 @@
-import pytest
 import re
-from rich.text import Text
+
+import pytest
 from click.testing import CliRunner
+from rich.text import Text
+
 from cloudmesh.ai.command import vm
-from tests.smoke.cli_helper import setup_cli_config
 from tests.smoke.benchmark_helper import save_benchmark
+from tests.smoke.cli_helper import setup_cli_config
+
 
 @pytest.fixture
 def runner():
     return CliRunner()
+
 
 @pytest.fixture
 def config(tmp_path, runner):
@@ -16,6 +20,7 @@ def config(tmp_path, runner):
         "image": "ubuntu",
     }
     setup_cli_config(tmp_path, "vbox", provider_config)
+
 
 def test_vbox_cli_lifecycle(runner, config):
     """
@@ -73,6 +78,7 @@ def test_vbox_cli_lifecycle(runner, config):
         # Cleanup
         runner.invoke(vm.vm_group, ["delete", vm_name])
         save_benchmark(tag="VBox CLI", config_path=None)
+
 
 def test_vbox_cli_start_with_name(runner, config):
     """

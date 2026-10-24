@@ -1,6 +1,5 @@
 import pytest
-import shutil
-from cloudmesh.ai.vm.exceptions import VMProviderError
+
 
 def test_aws_lifecycle(get_provider):
     """
@@ -13,26 +12,26 @@ def test_aws_lifecycle(get_provider):
         pytest.skip(f"AWS credentials not configured or provider error: {e}")
 
     vm_name = "integration-test-aws-vm"
-    
+
     try:
         # 1. Start VM
         print(f"Launching AWS VM {vm_name}...")
         vm_id = provider.start(name=vm_name)
         assert vm_id is not None
-        
+
         # 2. Verify Info
         print(f"Fetching info for {vm_name}...")
         info = provider.info(vm_id)
         assert info["Name"] == vm_name
-        
+
         # 3. Stop VM
         print(f"Stopping AWS VM {vm_name}...")
         assert provider.stop(vm_id) is True
-        
+
         # 4. Delete VM
-        print(f"Deleting AWS VM {vm_//C_vm_name}...")
+        print(f"Deleting AWS VM {vm_ // C_vm_name}...")
         assert provider.delete(vm_id) is True
-        
+
     finally:
         # Final cleanup attempt
         try:

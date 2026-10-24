@@ -1,9 +1,15 @@
-import click
-from typing import Optional
-from cloudmesh.ai.command._shared.context import console, get_active_provider, vm_options, state
-from cloudmesh.ai.command._shared.exceptions import handle_errors, VMCommandError
 import json
+
+import click
 import yaml
+
+from cloudmesh.ai.command._shared.context import (
+    console,
+    get_active_provider,
+    vm_options,
+)
+from cloudmesh.ai.command._shared.exceptions import VMCommandError, handle_errors
+
 
 @click.command()
 @click.pass_context
@@ -22,29 +28,33 @@ import yaml
 )
 @vm_options
 @handle_errors
-def info(ctx: click.Context,
-         name: Optional[str] = None,
-         as_json: bool = False,   # ← new argument
-         kind: str = "vm",
-         **kwargs) -> None:
+def info(
+    ctx: click.Context,
+    name: str | None = None,
+    as_json: bool = False,  # ← new argument
+    kind: str = "vm",
+    **kwargs,
+) -> None:
     """
     Get detailed information about a specific VM.
     """
     provider = get_active_provider(ctx)
-    
+
     # 1. Fetch VM information
     if name is None:
         from cloudmesh.ai.command._shared.context import resolve_vm_name
+
         name = resolve_vm_name(ctx, name)
 
     vm_info = provider.info(name, kind=kind)
-    
+
     if not vm_info:
         raise VMCommandError(f"No information found for VM '{name}'.")
-    
-    if "error" in vm_info:
-        raise VMCommandError(f"Could not retrieve info for VM '{name}': {vm_info['error']}")
 
+    if "error" in vm_info:
+        raise VMCommandError(
+            f"Could not retrieve info for VM '{name}': {vm_info['error']}"
+        )
 
     # 2. Display the information
     console.print(f"\n[bold blue]Information for VM: {name}[/bold blue]")
@@ -60,18 +70,19 @@ def info(ctx: click.Context,
         yaml_str = yaml.safe_dump(vm_info, sort_keys=False, default_flow_style=False)
         # Replace yellow (default for some YAML values) with blue for IDs/UUIDs
         import re
+
         # Regex to match UUIDs: 8-4-4-4-12 hex chars
-        uuid_pattern = r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})'
-        yaml_str = re.sub(uuid_pattern, r'[blue]\1[/blue]', yaml_str)
+        uuid_pattern = r"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"
+        yaml_str = re.sub(uuid_pattern, r"[blue]\1[/blue]", yaml_str)
         console.print(yaml_str)
 
-    
     # Iterate through the returned dictionary and print key-value pairs
-    #for key, value in vm_info.items():
+    # for key, value in vm_info.items():
     #    # Format keys to be more human-readable (e.g., "public_ip" -> "Public IP")
     #    display_key = key.replace("_", " ").title()
     #    console.print(f"[bold]{display_key}:[/bold] {value}")
-    
+
     console.print("-" * 30)
+
 
 cmd = info

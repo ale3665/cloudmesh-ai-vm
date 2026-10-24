@@ -5,9 +5,9 @@ import time
 import traceback
 import uuid
 
-from chi_auth import authenticate_chi_from_cloud
 import chi
 from chi import keypair, lease, network, server
+from chi_auth import authenticate_chi_from_cloud
 
 
 def banner(msg):
@@ -100,7 +100,7 @@ for i in range(10):
         break
     except chi.exception.ResourceError as e:
         if "None of the ports can route" in str(e):
-            print(f"  Port not ready yet, retrying in 3s... ({i+1}/10)")
+            print(f"  Port not ready yet, retrying in 3s... ({i + 1}/10)")
             time.sleep(3)
         else:
             raise e
@@ -128,7 +128,7 @@ s.add_security_group(sg.id)
 
 # 7. PRINT SSH CONNECTION DETAILS
 
-print(f"\nVM is ready! You can SSH in using:")
+print("\nVM is ready! You can SSH in using:")
 print(f"ssh cc@{fip_addr}")
 
 import datetime
@@ -138,9 +138,9 @@ import time
 import traceback
 import uuid
 
-from chi_auth import authenticate_chi_from_cloud
 import chi
 from chi import keypair, lease, network, server
+from chi_auth import authenticate_chi_from_cloud
 
 
 def banner(msg):
@@ -233,7 +233,7 @@ for i in range(10):
         break
     except chi.exception.ResourceError as e:
         if "None of the ports can route" in str(e):
-            print(f"  Port not ready yet, retrying in 3s... ({i+1}/10)")
+            print(f"  Port not ready yet, retrying in 3s... ({i + 1}/10)")
             time.sleep(3)
         else:
             raise e
@@ -261,6 +261,5 @@ s.add_security_group(sg.id)
 
 # 7. PRINT SSH CONNECTION DETAILS
 
-print(f"\nVM is ready! You can SSH in using:")
+print("\nVM is ready! You can SSH in using:")
 print(f"ssh cc@{fip_addr}")
-

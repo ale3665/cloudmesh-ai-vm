@@ -1,25 +1,30 @@
-import click
 import logging
 import os
 import re
-from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
+
+import click
+
 from cloudmesh.ai.vm.state_manager import StateManager
+
 
 @dataclass
 class VMContext:
-    cloud_override: Optional[str] = None
+    cloud_override: str | None = None
     interactive: bool = False
+
 
 # Initialize StateManager with the default config path or environment override
 DEFAULT_CONFIG_PATH = os.path.expanduser("~/.config/cloudmesh/clouds.yaml")
 CONFIG_PATH = os.environ.get("CLOUDMESH_VM_CONFIG", DEFAULT_CONFIG_PATH)
 state_manager = StateManager(CONFIG_PATH)
 
+
 class StateProxy:
     """
     Proxy class to provide easy access to the StateManager.
     """
+
     @property
     def config(self):
         return self._manager.config
@@ -27,7 +32,6 @@ class StateProxy:
     def save(self):
         """Saves the current configuration to the file."""
         # YamlDB usually auto-flush, but we keep this for API compatibility.
-        pass
 
     def increment_counter(self) -> int:
         return self._manager.increment_counter()
@@ -35,8 +39,9 @@ class StateProxy:
     def set_last_vm(self, cloud_name: str, vm_name: str):
         self._manager.set_last_vm(cloud_name, vm_name)
 
-    def get_last_vm(self, cloud_name: str) -> Optional[str]:
+    def get_last_vm(self, cloud_name: str) -> str | None:
         return self._manager.get_last_vm(cloud_name)
+
     @property
     def db(self):
         return self._manager.db
@@ -45,9 +50,11 @@ class StateProxy:
         """Allows tests to inject a different StateManager."""
         self._manager = manager
 
+
 # Create the singleton instance
 state = StateProxy()
 state.set_manager(state_manager)
+
 
 def cloud_callback(ctx: click.Context, param, value):
     if value:
@@ -56,18 +63,22 @@ def cloud_callback(ctx: click.Context, param, value):
         ctx.obj.cloud_override = value
     return value
 
+
 def debug_callback(ctx: click.Context, param, value):
     if value:
         logging.getLogger("cloudmesh.ai.vm").setLevel(logging.DEBUG)
     return value
+
 
 def verbose_callback(ctx: click.Context, param, value):
     if value:
         pass
     return value
 
+
 def get_active_provider(ctx: click.Context):
     from .providers_utils import register_providers
+
     register_providers()
 
     default_cloud = "multipass"
@@ -87,11 +98,15 @@ def get_active_provider(ctx: click.Context):
 
     try:
         from cloudmesh.ai.vm.providers import get_provider
+
         return get_provider(cloud)
     except Exception as e:
-        raise click.ClickException(f"Unsupported or misconfigured cloud provider: {cloud}. Error: {e}")
+        raise click.ClickException(
+            f"Unsupported or misconfigured cloud provider: {cloud}. Error: {e}"
+        )
 
-def resolve_vm_name(ctx: click.Context, name: Optional[str]) -> str:
+
+def resolve_vm_name(ctx: click.Context, name: str | None) -> str:
     if name:
         return name
 
@@ -112,41 +127,63 @@ def resolve_vm_name(ctx: click.Context, name: Optional[str]) -> str:
     # 2. Fallback: If there's exactly one active VM, use it
     try:
         all_vms = provider.list()
-        active_vms = [vm["name"] for vm in all_vms if vm.get("status", "").lower() in ("active", "running")]
+        active_vms = [
+            vm["name"]
+            for vm in all_vms
+            if vm.get("status", "").lower() in ("active", "running")
+        ]
         if len(active_vms) == 1:
             return active_vms[0]
     except Exception:
         pass
 
-    raise click.ClickException("No VM name provided and no active VM found in session. Please provide a name or use 'cmx vm list' to find one.")
+    raise click.ClickException(
+        "No VM name provided and no active VM found in session. Please provide a name or use 'cmx vm list' to find one."
+    )
+
 
 def vm_options(f):
     """Decorator to add common VM options."""
-    f = click.option("--cloud", callback=cloud_callback, help="Cloud provider override")(f)
-    f = click.option("--debug", is_flag=True, callback=debug_callback, help="Enable debug logging")(f)
-    f = click.option("--verbose", is_flag=True, callback=verbose_callback, help="Enable verbose output")(f)
+    f = click.option(
+        "--cloud", callback=cloud_callback, help="Cloud provider override"
+    )(f)
+    f = click.option(
+        "--debug", is_flag=True, callback=debug_callback, help="Enable debug logging"
+    )(f)
+    f = click.option(
+        "--verbose",
+        is_flag=True,
+        callback=verbose_callback,
+        help="Enable verbose output",
+    )(f)
     return f
 
+
 from rich.console import Console
+
 console = Console()
 
-def _parse_range(range_str: str) -> List[int]:
+
+def _parse_range(range_str: str) -> list[int]:
     """Parse a range string like '1-5' or '1' into a list of integers."""
     try:
-        if '-' in range_str:
-            start_str, end_str = range_str.split('-', 1)
+        if "-" in range_str:
+            start_str, end_str = range_str.split("-", 1)
             return list(range(int(start_str), int(end_str) + 1))
         return [int(range_str)]
     except ValueError as e:
         # We use click.ClickException here to avoid circular dependency with exceptions.py
-        raise click.ClickException(f"Invalid range format '{range_str}'. Expected 'start-end' (e.g. 1-5).") from e
+        raise click.ClickException(
+            f"Invalid range format '{range_str}'. Expected 'start-end' (e.g. 1-5)."
+        ) from e
 
-def _expand_hostlist(name: str, username: str) -> List[str]:
+
+def _expand_hostlist(name: str, username: str) -> list[str]:
     """
     Expands a hostlist pattern like 'node[1-3]' into ['node-1', 'node-2', 'node-3'].
     """
-    if '[' in name and name.endswith(']'):
-        base, range_part = name.split('[', 1)
+    if "[" in name and name.endswith("]"):
+        base, range_part = name.split("[", 1)
         range_str = range_part[:-1]
         indices = _parse_range(range_str)
         # Use a hyphen separator consistent with the username-counter pattern
@@ -154,17 +191,18 @@ def _expand_hostlist(name: str, username: str) -> List[str]:
         return [f"{base}{sep}{i}" for i in indices]
     return [name]
 
-def _filter_by_regex(pattern: str, provider) -> List[str]:
+
+def _filter_by_regex(pattern: str, provider) -> list[str]:
     """
     Filters VMs in the provider based on a regex or wildcard pattern.
     """
     # Convert glob wildcards to regex
     # * -> .*
     # ? -> .
-    regex_pattern = pattern.replace('*', '.*').replace('?', '.')
+    regex_pattern = pattern.replace("*", ".*").replace("?", ".")
     # Ensure we match from the start
-    if not regex_pattern.startswith('^'):
-        regex_pattern = '^' + regex_pattern
+    if not regex_pattern.startswith("^"):
+        regex_pattern = "^" + regex_pattern
 
     try:
         compiled = re.compile(regex_pattern)
@@ -175,7 +213,13 @@ def _filter_by_regex(pattern: str, provider) -> List[str]:
     matches = [vm["name"] for vm in all_vms if compiled.match(vm["name"])]
     return matches
 
-def resolve_vms(ctx: click.Context, name: Optional[str] = None, count: Optional[int] = None, vm_range: Optional[str] = None) -> List[str]:
+
+def resolve_vms(
+    ctx: click.Context,
+    name: str | None = None,
+    count: int | None = None,
+    vm_range: str | None = None,
+) -> list[str]:
     """
     Resolves a list of VM names based on a name (single, hostlist, or regex), a count, or a range.
     """
@@ -183,15 +227,19 @@ def resolve_vms(ctx: click.Context, name: Optional[str] = None, count: Optional[
 
     # 1. Determine the base username for range-based resolution
     provider_config = provider.get_cloud_config(provider.cloud_name)
-    raw_username = provider_config.get("username") or state.config.db.get("username", "user")
+    raw_username = provider_config.get("username") or state.config.db.get(
+        "username", "user"
+    )
     username = raw_username.replace("_", "-")
 
-    vms: List[str] = []
+    vms: list[str] = []
 
     if vm_range:
         indices = _parse_range(vm_range)
         vms = [f"{username}-{i}" for i in indices]
-        console.print(f"Targeting VMs in range {vm_range} ([bold blue]{', '.join(vms)}[/bold blue])")
+        console.print(
+            f"Targeting VMs in range {vm_range} ([bold blue]{', '.join(vms)}[/bold blue])"
+        )
 
     elif count:
         all_vms = provider.list()
@@ -210,23 +258,29 @@ def resolve_vms(ctx: click.Context, name: Optional[str] = None, count: Optional[
 
         to_select = all_vms[:count]
         vms = [vm["name"] for vm in to_select]
-        console.print(f"Targeting last {count} VMs: [bold blue]{', '.join(vms)}[/bold blue]")
+        console.print(
+            f"Targeting last {count} VMs: [bold blue]{', '.join(vms)}[/bold blue]"
+        )
 
     elif name:
         # 1. Explicit Wildcards/Anchors -> Definitely Regex
-        if any(char in name for char in ['*', '?', '^', '$']):
+        if any(char in name for char in ["*", "?", "^", "$"]):
             vms = _filter_by_regex(name, provider)
             if not vms:
                 raise click.ClickException(f"No VMs found matching pattern: {name}")
-            console.print(f"Pattern match. Targeting VMs: [bold blue]{', '.join(vms)}[/bold blue]")
+            console.print(
+                f"Pattern match. Targeting VMs: [bold blue]{', '.join(vms)}[/bold blue]"
+            )
 
         # 2. Hostlist Range (e.g., 'node[1-3]') or Regex with brackets
-        elif '[' in name and name.endswith(']'):
+        elif "[" in name and name.endswith("]"):
             try:
                 vms = _expand_hostlist(name, username)
                 # If it expanded to multiple VMs, it was a valid range
                 if len(vms) > 1:
-                    console.print(f"Expanded hostlist. Targeting VMs: [bold blue]{', '.join(vms)}[/bold blue]")
+                    console.print(
+                        f"Expanded hostlist. Targeting VMs: [bold blue]{', '.join(vms)}[/bold blue]"
+                    )
                 elif len(vms) == 1 and vms[0] == name:
                     # It didn't expand (returned [name]), so it's either a single VM
                     # or a regex that didn't match the range format.
@@ -235,7 +289,9 @@ def resolve_vms(ctx: click.Context, name: Optional[str] = None, count: Optional[
                     if not vms:
                         vms = [name]
                     elif len(vms) > 1:
-                        console.print(f"Pattern match. Targeting VMs: [bold blue]{', '.join(vms)}[/bold blue]")
+                        console.print(
+                            f"Pattern match. Targeting VMs: [bold blue]{', '.join(vms)}[/bold blue]"
+                        )
                 else:
                     # Expanded to 1 VM (e.g. node[1-1]), which is valid.
                     pass
@@ -244,14 +300,18 @@ def resolve_vms(ctx: click.Context, name: Optional[str] = None, count: Optional[
                 vms = _filter_by_regex(name, provider)
                 if not vms:
                     raise click.ClickException(f"No VMs found matching pattern: {name}")
-                console.print(f"Pattern match. Targeting VMs: [bold blue]{', '.join(vms)}[/bold blue]")
+                console.print(
+                    f"Pattern match. Targeting VMs: [bold blue]{', '.join(vms)}[/bold blue]"
+                )
 
         # 3. Other regex characters
-        elif any(char in name for char in ['(', ')', '[', ']']):
+        elif any(char in name for char in ["(", ")", "[", "]"]):
             vms = _filter_by_regex(name, provider)
             if not vms:
                 raise click.ClickException(f"No VMs found matching pattern: {name}")
-            console.print(f"Pattern match. Targeting VMs: [bold blue]{', '.join(vms)}[/bold blue]")
+            console.print(
+                f"Pattern match. Targeting VMs: [bold blue]{', '.join(vms)}[/bold blue]"
+            )
 
         # 4. Exact match
         else:

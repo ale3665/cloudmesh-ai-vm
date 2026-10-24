@@ -1,11 +1,15 @@
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 from cloudmesh.ai.vm.LibcloudManager import LibcloudManager
 
 try:
     from libcloud.compute.providers.gce import GCEDriver
 except ImportError:
+
     class GCEDriver:
-        def __init__(self, *args, **kwargs): pass
+        def __init__(self, *args, **kwargs):
+            pass
+
 
 class Provider(LibcloudManager):
     """
@@ -19,10 +23,10 @@ class Provider(LibcloudManager):
         cloud_config = self.get_cloud_config("google")
         return GCEDriver(
             project_id=cloud_config.get("project_id"),
-            private_key=cloud_config.get("private_key")
+            private_key=cloud_config.get("private_key"),
         )
 
-    def assign_floating_ip(self, name: str) -> Optional[str]:
+    def assign_floating_ip(self, name: str) -> str | None:
         """
         Assigns a floating (static external) IP to the Google VM.
         """
@@ -38,7 +42,9 @@ class Provider(LibcloudManager):
             address = self.driver.ex_create_address(name=f"ip-{name}", region=region)
             # Assign the static IP to the node
             # nic is typically 'nic0' for the primary interface
-            self.driver.ex_add_access_config(node=node, name="external-nat", nic="nic0", nat_ip=address)
+            self.driver.ex_add_access_config(
+                node=node, name="external-nat", nic="nic0", nat_ip=address
+            )
 
             return address
         except Exception as e:
@@ -54,14 +60,16 @@ class Provider(LibcloudManager):
             if not node:
                 raise VMResourceError(f"VM {name} not found in Google")
 
-            public_ips = getattr(node, 'public_ips', [])
+            public_ips = getattr(node, "public_ips", [])
             if not public_ips:
                 logger.warning(f"No public IP found to release for VM {name}")
                 return False
 
             address = public_ips[0]
             # Disassociate first
-            self.driver.ex_delete_access_config(node=node, name="external-nat", nic="nic0")
+            self.driver.ex_delete_access_config(
+                node=node, name="external-nat", nic="nic0"
+            )
             # Release the address
             self.driver.ex_destroy_address(address=address)
             return True
@@ -69,13 +77,15 @@ class Provider(LibcloudManager):
             logger.error(f"Error releasing floating IP from {name} in Google: {e}")
             raise VMProviderError(f"Failed to release floating IP from {name}: {e}")
 
-    def get_provider_info(self) -> Dict[str, Any]:
+    def get_provider_info(self) -> dict[str, Any]:
         """Gets detailed information about the Google provider."""
         import subprocess
 
         version = "Unknown"
         try:
-            result = subprocess.run(["gcloud", "--version"], capture_output=True, text=True)
+            result = subprocess.run(
+                ["gcloud", "--version"], capture_output=True, text=True
+            )
             if result.returncode == 0:
                 # gcloud --version returns multiple lines, take the first one
                 version = result.stdout.splitlines()[0].strip()
@@ -92,7 +102,7 @@ class Provider(LibcloudManager):
             },
         }
 
-    def restart(self, name: Optional[str] = None) -> bool:
+    def restart(self, name: str | None = None) -> bool:
         """Restarts a Google VM using the native reboot command."""
         if not name:
             return False
@@ -100,10 +110,10 @@ class Provider(LibcloudManager):
             node = self.driver.get_node(name)
             if not node:
                 return False
-            if hasattr(node, 'reboot'):
+            if hasattr(node, "reboot"):
                 node.reboot()
                 return True
-            if hasattr(self.driver, 'reboot_node'):
+            if hasattr(self.driver, "reboot_node"):
                 self.driver.reboot_node(node)
                 return True
             raise ProviderFeatureNotSupported(self.cloud_name, "restart")
@@ -113,7 +123,7 @@ class Provider(LibcloudManager):
             logger.error(f"Error restarting Google VM {name}: {e}")
             return False
 
-    def suspend(self, name: Optional[str] = None) -> bool:
+    def suspend(self, name: str | None = None) -> bool:
         """
         Suspends a Google VM. Tries native suspend first;
         falls back to stop to ensure compute resources are released.
@@ -124,17 +134,19 @@ class Provider(LibcloudManager):
             node = self.driver.get_node(name)
             if not node:
                 return False
-            if hasattr(node, 'suspend'):
+            if hasattr(node, "suspend"):
                 node.suspend()
                 return True
 
-            logger.info(f"Native suspend not supported for {name}. Falling back to stop...")
+            logger.info(
+                f"Native suspend not supported for {name}. Falling back to stop..."
+            )
             return self.stop(name)
         except Exception as e:
             logger.error(f"Error suspending Google VM {name}: {e}")
             return False
 
-    def reset(self, name: Optional[str] = None) -> bool:
+    def reset(self, name: str | None = None) -> bool:
         """
         Resets a Google VM. Performs a hard power cycle (stop -> start)
         if the native restart fails.
@@ -147,12 +159,12 @@ class Provider(LibcloudManager):
                 return True
 
             # 2. Fallback: Hard Power Cycle
-            logger.info(f"Native restart failed for {name}. Performing hard reset (stop -> start)...")
+            logger.info(
+                f"Native restart failed for {name}. Performing hard reset (stop -> start)..."
+            )
             if self.stop(name):
                 return self.start(name=name)
             return False
         except Exception as e:
             logger.error(f"Error resetting Google VM {name}: {e}")
             return False
-
-

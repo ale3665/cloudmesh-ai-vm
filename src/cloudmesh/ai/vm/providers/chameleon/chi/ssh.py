@@ -23,7 +23,7 @@ class Remote(Connection):
             kwargs["connect_kwargs"] = {}
         key_filename = context.get("keypair_private_key")
         kwargs["connect_kwargs"].setdefault("key_filename", key_filename)
-        super(Remote, self).__init__(ip, user=user, **kwargs)
+        super().__init__(ip, user=user, **kwargs)
         # Default policy is to automatically add unknown hosts
         # - for our use-case, the host is almost always guaranteed to be unknown.
         self.client.set_missing_host_key_policy(AutoAddPolicy)

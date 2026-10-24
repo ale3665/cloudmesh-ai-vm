@@ -1,10 +1,14 @@
+import builtins
 import re
-import time
 import shutil
-from typing import List, Dict, Any, Optional
+import time
+from typing import Any
+
+from cloudmesh.ai.vm.exceptions import VMProviderError, VMResourceError
 from cloudmesh.ai.vm.logger import logger
+
 from ..LocalBaseManager import LocalBaseManager
-from cloudmesh.ai.vm.exceptions import VMProviderError, VMResourceError, ConfigError
+
 
 class Provider(LocalBaseManager):
     """
@@ -14,7 +18,13 @@ class Provider(LocalBaseManager):
 
     STATE_PATTERN = re.compile(r"State:\s+([a-zA-Z]+)")
 
-    def start(self, name: Optional[str] = None, flavor: Optional[str] = None, image: Optional[str] = None, **kwargs) -> str:
+    def start(
+        self,
+        name: str | None = None,
+        flavor: str | None = None,
+        image: str | None = None,
+        **kwargs,
+    ) -> str:
         """
         Starts a VirtualBox VM.
         Note: VBoxManage does not have a simple 'launch' like Multipass.
@@ -30,7 +40,7 @@ class Provider(LocalBaseManager):
         except Exception as e:
             raise VMProviderError(f"Failed to start VirtualBox VM {name}: {e}")
 
-    def stop(self, name: Optional[str] = None) -> bool:
+    def stop(self, name: str | None = None) -> bool:
         """
         Stops a VirtualBox VM.
         """
@@ -44,7 +54,7 @@ class Provider(LocalBaseManager):
         except Exception as e:
             raise VMProviderError(f"Error stopping VM {name}: {e}")
 
-    def delete(self, name: Optional[str] = None) -> bool:
+    def delete(self, name: str | None = None) -> bool:
         """
         Deletes a VirtualBox VM and its registered files.
         """
@@ -58,14 +68,14 @@ class Provider(LocalBaseManager):
         except Exception as e:
             raise VMProviderError(f"Error deleting VM {name}: {e}")
 
-    def list(self) -> List[Dict[str, Any]]:
+    def list(self) -> list[dict[str, Any]]:
         """
         Lists VirtualBox VMs.
         """
         try:
             result = self._run_command(["VBoxManage", "list", "vms"])
             lines = result.stdout.strip().split("\n")
-            if not lines or lines == ['']:
+            if not lines or lines == [""]:
                 return []
 
             vms = []
@@ -74,15 +84,12 @@ class Provider(LocalBaseManager):
                 # Use a greedy match for the name to handle names with quotes.
                 match = re.match(r'^"(.+)"\s+\{([a-f0-9-]+)\}$', line)
                 if match:
-                    vms.append({
-                        "name": match.group(1),
-                        "uuid": match.group(2)
-                    })
+                    vms.append({"name": match.group(1), "uuid": match.group(2)})
             return vms
         except Exception as e:
             raise VMProviderError(f"Error listing VirtualBox VMs: {e}")
 
-    def login(self, name: Optional[str] = None) -> bool:
+    def login(self, name: str | None = None) -> bool:
         """
         VirtualBox does not provide a built-in shell like 'multipass shell'.
         This method informs the user to use SSH or the GUI.
@@ -91,11 +98,13 @@ class Provider(LocalBaseManager):
             logger.error("VM name is required to login.")
             raise VMProviderError("VM name is required to login.")
 
-        logger.info(f"Note: VirtualBox does not have a native shell. Please use SSH to log into {name}.")
+        logger.info(
+            f"Note: VirtualBox does not have a native shell. Please use SSH to log into {name}."
+        )
         logger.info(f"Example: ssh username@{ip_address}")
         return False
 
-    def suspend(self, name: Optional[str] = None) -> bool:
+    def suspend(self, name: str | None = None) -> bool:
         """
         Suspends a VirtualBox VM (Saves state).
         """
@@ -110,7 +119,7 @@ class Provider(LocalBaseManager):
             logger.error(f"Error suspending VM {name}: {e}")
             raise VMProviderError(f"Error suspending VM {name}: {e}")
 
-    def restart(self, name: Optional[str] = None) -> bool:
+    def restart(self, name: str | None = None) -> bool:
         """
         Restarts a VirtualBox VM.
         """
@@ -125,26 +134,28 @@ class Provider(LocalBaseManager):
             logger.error(f"Error restarting VM {name}: {e}")
             raise VMProviderError(f"Error restarting VM {name}: {e}")
 
-    def get_flavors(self, **kwargs) -> List[Dict[str, Any]]:
+    def get_flavors(self, **kwargs) -> builtins.list[dict[str, Any]]:
         """
         VirtualBox resources are configured per VM.
         """
-        return [{"name": "default", "description": "Customizable in VBoxManage modifyvm"}]
+        return [
+            {"name": "default", "description": "Customizable in VBoxManage modifyvm"}
+        ]
 
-    def get_keys(self) -> List[Dict[str, Any]]:
+    def get_keys(self) -> builtins.list[dict[str, Any]]:
         """
         VirtualBox doesn't manage SSH keys.
         """
         return [{"name": "local-key", "path": "~/.ssh/id_rsa"}]
 
-    def get_security_groups(self) -> List[Dict[str, Any]]:
+    def get_security_groups(self) -> builtins.list[dict[str, Any]]:
         """
         VirtualBox uses Networking Modes (NAT, Bridged, etc.)
         """
         return [{"name": "NAT", "description": "Default VirtualBox NAT network"}]
 
     @property
-    def version(self) -> List[str]:
+    def version(self) -> builtins.list[str]:
         """
         Returns a list of version strings for the VBoxManage tool.
         """
@@ -182,18 +193,28 @@ class Provider(LocalBaseManager):
         try:
             # We use /bin/sh -c to allow running complex shell commands.
             # The user is responsible for sanitizing 'cmd'.
-            result = self._run_command([
-                "VBoxManage", "guestcontrol", name, "run",
-                f"--username={username}",
-                f"--password={password}",
-                "--exe", "/bin/sh",
-                "--args", "-c", cmd
-            ])
+            result = self._run_command(
+                [
+                    "VBoxManage",
+                    "guestcontrol",
+                    name,
+                    "run",
+                    f"--username={username}",
+                    f"--password={password}",
+                    "--exe",
+                    "/bin/sh",
+                    "--args",
+                    "-c",
+                    cmd,
+                ]
+            )
             return result.stdout
         except Exception as e:
-            raise VMProviderError(f"Error executing command on VirtualBox VM {name} (requires Guest Additions): {e}")
+            raise VMProviderError(
+                f"Error executing command on VirtualBox VM {name} (requires Guest Additions): {e}"
+            )
 
-    def info(self, name: str, kind: str = "vm") -> Dict[str, Any]:
+    def info(self, name: str, kind: str = "vm") -> dict[str, Any]:
         """Gets detailed information about a VirtualBox VM."""
         if not name or not self.exists(name):
             raise VMResourceError(f"VM {name} not found.")
@@ -203,13 +224,13 @@ class Provider(LocalBaseManager):
         except Exception as e:
             raise VMProviderError(f"Error getting info for VM {name}: {e}")
 
-    def validate_config(self) -> Dict[str, List[str]]:
+    def validate_config(self) -> dict[str, builtins.list[str]]:
         """
         Validates VirtualBox configuration.
         """
         return {}
 
-    def get_provider_info(self) -> Dict[str, Any]:
+    def get_provider_info(self) -> dict[str, Any]:
         """Gets detailed information about the VirtualBox provider."""
         return {
             "provider": "VirtualBox",
@@ -220,11 +241,15 @@ class Provider(LocalBaseManager):
             },
         }
 
-    def wait_for_status(self, name: str, target_status: str, timeout: int = 300) -> bool:
+    def wait_for_status(
+        self, name: str, target_status: str, timeout: int = 300
+    ) -> bool:
         """
         Polls the VirtualBox VM status until it matches target_status.
         """
-        logger.info(f"Waiting for VirtualBox VM {name} to reach status {target_status}...")
+        logger.info(
+            f"Waiting for VirtualBox VM {name} to reach status {target_status}..."
+        )
         start_time = time.time()
         target_status_lower = target_status.lower()
 
@@ -252,5 +277,7 @@ class Provider(LocalBaseManager):
 
             time.sleep(5)
 
-        logger.error(f"Timeout reached waiting for VirtualBox VM {name} to reach status {target_status}.")
+        logger.error(
+            f"Timeout reached waiting for VirtualBox VM {name} to reach status {target_status}."
+        )
         return False

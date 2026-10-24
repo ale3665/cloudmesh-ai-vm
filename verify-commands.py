@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-import subprocess
 import re
-import sys
-from typing import List, Callable, Any, Tuple, Optional
+import subprocess
+from collections.abc import Callable
 
-def run_command(cmd: List[str]) -> Optional[str]:
+
+def run_command(cmd: list[str]) -> str | None:
     """Executes a shell command and returns its stdout."""
     print(f"Running: {' '.join(cmd)}")
     try:
@@ -14,17 +14,17 @@ def run_command(cmd: List[str]) -> Optional[str]:
         print(f"Error executing command: {e.stderr or e.output}")
         return None
 
-def verify_step(step_name: str, 
-                cmd: List[str], 
-                validation_fn: Callable[[Optional[str]], 
-                bool]) -> bool:
+
+def verify_step(
+    step_name: str, cmd: list[str], validation_fn: Callable[[str | None], bool]
+) -> bool:
     """Generic wrapper to run a command and validate its output."""
     print(f"\nChecking '{' '.join(cmd)}'...")
     output = run_command(cmd)
     print(79 * "=")
     print(output)
     print(79 * "=")
-            
+
     if output is not None and validation_fn(output):
         print(f"✅ {step_name}: PASS")
         return True
@@ -32,26 +32,27 @@ def verify_step(step_name: str,
         print(f"❌ {step_name}: FAIL")
         return False
 
+
 def print_summary(results):
-    print("\n" + "="*30)
+    print("\n" + "=" * 30)
     print(" VERIFICATION SUMMARY")
-    print("="*30)
+    print("=" * 30)
     passed = sum(1 for _, success in results if success)
     total = len(results)
-    
+
     for name, success in results:
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"{name:<20} : {status}")
-        
-    
+
     print("-" * 30)
     print(f"Total: {total} | Passed: {passed} | Failed: {total - passed}")
-    print("="*30)
-    
+    print("=" * 30)
+
     if passed == total:
         print("OVERALL STATUS: SUCCESS")
     else:
         print("OVERALL STATUS: FAILURE")
+
 
 def main():
     print("Starting verification of 'cmc vm' commands...\n")
@@ -59,17 +60,13 @@ def main():
 
     # --- Phase 1: Discovery Tests (Independent) ---
     discovery_tests = [
-        ("config", 
-         ["cmc", "vm", "config"], 
-         lambda out: "Configuration file location" in out),
-
-        ("images", 
-         ["cmc", "vm", "images"], 
-         lambda out: len(out.strip()) > 0),
-
-        ("flavors", 
-         ["cmc", "vm", "flavors"], 
-         lambda out: len(out.strip()) > 0),
+        (
+            "config",
+            ["cmc", "vm", "config"],
+            lambda out: "Configuration file location" in out,
+        ),
+        ("images", ["cmc", "vm", "images"], lambda out: len(out.strip()) > 0),
+        ("flavors", ["cmc", "vm", "flavors"], lambda out: len(out.strip()) > 0),
     ]
 
     for name, cmd, validator in discovery_tests:
@@ -78,7 +75,7 @@ def main():
 
     # --- Phase 2: VM Lifecycle Tests (Dependent) ---
     print("\n--- Starting VM Lifecycle Tests ---")
-    
+
     # Start VM
     print("\nChecking 'cmc vm start'...")
     start_out = run_command(["cmc", "vm", "start"])
@@ -103,40 +100,52 @@ def main():
 
     # Define Lifecycle tests using lambdas for dynamic commands/validation
     lifecycle_tests = [
-        ("run --name", 
-         lambda n: (["cmc", "vm", "run", "--name", n, "hostname"], 
-         lambda out: out and out.strip()), 
-         vm_name),
-
-        ("run (last vm)", 
-         lambda n: (["cmc", "vm", "run", "hostname"], 
-         lambda out: out and out.strip()), 
-         vm_name),
-
-        ("info", 
-         lambda n: (["cmc", "vm", "info", n], 
-         lambda out: n in out), 
-         vm_name),
-
-        ("list", 
-         lambda n: (["cmc", "vm", "list"], 
-         lambda out: n in out and (hostname in out)), 
-         vm_name),
-
-        ("ssh-config", 
-         lambda n: (["cmc", "vm", "ssh-config"], 
-         lambda out: n in out), 
-         vm_name),
-
-        ("stop", 
-         lambda n: (["cmc", "vm", "stop", "--name", n], 
-         lambda out: out and "stopped" in out.lower()), 
-         vm_name),
-
-        ("delete", 
-         lambda n: (["cmc", "vm", "delete", "--name", n], 
-         lambda out: out and "deleted" in out.lower()), 
-         vm_name),
+        (
+            "run --name",
+            lambda n: (
+                ["cmc", "vm", "run", "--name", n, "hostname"],
+                lambda out: out and out.strip(),
+            ),
+            vm_name,
+        ),
+        (
+            "run (last vm)",
+            lambda n: (
+                ["cmc", "vm", "run", "hostname"],
+                lambda out: out and out.strip(),
+            ),
+            vm_name,
+        ),
+        ("info", lambda n: (["cmc", "vm", "info", n], lambda out: n in out), vm_name),
+        (
+            "list",
+            lambda n: (
+                ["cmc", "vm", "list"],
+                lambda out: n in out and (hostname in out),
+            ),
+            vm_name,
+        ),
+        (
+            "ssh-config",
+            lambda n: (["cmc", "vm", "ssh-config"], lambda out: n in out),
+            vm_name,
+        ),
+        (
+            "stop",
+            lambda n: (
+                ["cmc", "vm", "stop", "--name", n],
+                lambda out: out and "stopped" in out.lower(),
+            ),
+            vm_name,
+        ),
+        (
+            "delete",
+            lambda n: (
+                ["cmc", "vm", "delete", "--name", n],
+                lambda out: out and "deleted" in out.lower(),
+            ),
+            vm_name,
+        ),
     ]
 
     for name, template, context_name in lifecycle_tests:
@@ -145,6 +154,7 @@ def main():
         results.append((name, success))
 
     print_summary(results)
+
 
 if __name__ == "__main__":
     main()

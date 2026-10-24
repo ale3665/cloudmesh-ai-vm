@@ -1,14 +1,22 @@
-from typing import List, Dict, Any, Optional
+import builtins
 import os
 import subprocess
+from typing import Any
+
 from cloudmesh.ai.vm.CloudBaseManager import CloudBaseManager
-from cloudmesh.ai.vm.exceptions import ConfigError, VMResourceError, VMAuthError, VMNetworkError, VMProviderError, ProviderFeatureNotSupported
+from cloudmesh.ai.vm.exceptions import (
+    ConfigError,
+    ProviderFeatureNotSupported,
+    VMProviderError,
+    VMResourceError,
+)
 from cloudmesh.ai.vm.logger import logger
 
 try:
     import oci
 except ImportError:
     oci = None
+
 
 class Provider(CloudBaseManager):
     """
@@ -24,7 +32,9 @@ class Provider(CloudBaseManager):
     def _init_oci_client(self):
         """Initializes OCI clients using configuration from clouds.yaml."""
         if oci is None:
-            logger.error("OCI SDK not installed. Please install it using 'pip install oci'.")
+            logger.error(
+                "OCI SDK not installed. Please install it using 'pip install oci'."
+            )
             return
 
         cloud_config = self.get_cloud_config(self.cloud_name)
@@ -33,13 +43,22 @@ class Provider(CloudBaseManager):
         # We build a config dictionary compatible with oci.config.from_dict
         oci_config = {
             "user": cloud_config.get("user"),
-            "key_file": os.path.expanduser(cloud_config.get("key_file", "~/.oci/oci_api_key.pem")),
+            "key_file": os.path.expanduser(
+                cloud_config.get("key_file", "~/.oci/oci_api_key.pem")
+            ),
             "fingerprint": cloud_config.get("fingerprint"),
             "tenancy": cloud_config.get("tenancy"),
             "region": cloud_config.get("region"),
         }
 
-        if not all([oci_config["user"], oci_config["tenancy"], oci_config["fingerprint"], oci_config["region"]]):
+        if not all(
+            [
+                oci_config["user"],
+                oci_config["tenancy"],
+                oci_config["fingerprint"],
+                oci_config["region"],
+            ]
+        ):
             logger.warning(f"OCI configuration for {self.cloud_name} is incomplete.")
 
         try:
@@ -51,7 +70,13 @@ class Provider(CloudBaseManager):
             logger.error(f"Failed to initialize OCI client: {e}")
             self.compute_client = None
 
-    def start(self, name: Optional[str] = None, flavor: Optional[str] = None, image: Optional[str] = None, **kwargs) -> str:
+    def start(
+        self,
+        name: str | None = None,
+        flavor: str | None = None,
+        image: str | None = None,
+        **kwargs,
+    ) -> str:
         """
         Launches a VM in Oracle Cloud.
         """
@@ -65,7 +90,9 @@ class Provider(CloudBaseManager):
         compartment_id = cloud_config.get("compartment_id")
 
         if not all([image_id, shape, subnet_id, compartment_id]):
-            raise ConfigError(f"Missing required OCI config: image, flavor/size, subnet_id, or compartment_id")
+            raise ConfigError(
+                "Missing required OCI config: image, flavor/size, subnet_id, or compartment_id"
+            )
 
         vm_name = name or f"vm-{self.cloud_name}"
 
@@ -77,17 +104,20 @@ class Provider(CloudBaseManager):
                 display_name=vm_name,
                 image_id=image_id,
                 create_vnic_details=oci.core.models.CreateVnicDetails(
-                    subnet_id=subnet_id,
-                    assign_public_ip=True
-                )
+                    subnet_id=subnet_id, assign_public_ip=True
+                ),
             )
 
             instance = self.compute_client.launch_instance(launch_details)
-            logger.info(f"Successfully started Oracle VM {vm_name} (ID: {instance.data.id})")
+            logger.info(
+                f"Successfully started Oracle VM {vm_name} (ID: {instance.data.id})"
+            )
             return instance.data.id
         except Exception as e:
             logger.error(f"OCI launch failed for {self.cloud_name}: {e}")
-            raise VMProviderError(f"OCI launch failed for {self.cloud_name}: {e}") from e
+            raise VMProviderError(
+                f"OCI launch failed for {self.cloud_name}: {e}"
+            ) from e
 
     def exists(self, name: str) -> bool:
         """
@@ -99,7 +129,7 @@ class Provider(CloudBaseManager):
         except Exception:
             return False
 
-    def stop(self, name: Optional[str] = None) -> bool:
+    def stop(self, name: str | None = None) -> bool:
         """Stops an Oracle VM."""
         if not name:
             return False
@@ -113,7 +143,7 @@ class Provider(CloudBaseManager):
             logger.error(f"OCI stop failed for {name}: {e}")
             raise VMProviderError(f"OCI stop failed for {name}: {e}") from e
 
-    def delete(self, name: Optional[str] = None) -> bool:
+    def delete(self, name: str | None = None) -> bool:
         """Deletes an Oracle VM."""
         if not name:
             return False
@@ -127,7 +157,7 @@ class Provider(CloudBaseManager):
             logger.error(f"OCI delete failed for {name}: {e}")
             raise VMProviderError(f"OCI delete failed for {name}: {e}") from e
 
-    def restart(self, name: Optional[str] = None) -> bool:
+    def restart(self, name: str | None = None) -> bool:
         """Restarts an Oracle VM using the native reboot command."""
         if not name:
             return False
@@ -143,7 +173,7 @@ class Provider(CloudBaseManager):
             logger.error(f"OCI restart failed for {name}: {e}")
             return False
 
-    def suspend(self, name: Optional[str] = None) -> bool:
+    def suspend(self, name: str | None = None) -> bool:
         """
         Suspends an Oracle VM. In OCI, this is mapped to 'STOP' to release
         compute resources and stop billing.
@@ -160,7 +190,7 @@ class Provider(CloudBaseManager):
             logger.error(f"OCI suspend failed for {name}: {e}")
             return False
 
-    def reset(self, name: Optional[str] = None) -> bool:
+    def reset(self, name: str | None = None) -> bool:
         """
         Resets an Oracle VM. Performs a hard power cycle (stop -> start)
         if the native reset fails.
@@ -174,8 +204,10 @@ class Provider(CloudBaseManager):
             instance_id = self._resolve_instance_id(name)
             self.compute_client.instance_action(instance_id, "RESET")
             return True
-        except Exception as e:
-            logger.info(f"Native reset failed for {name}. Performing hard reset (stop -> start)...")
+        except Exception:
+            logger.info(
+                f"Native reset failed for {name}. Performing hard reset (stop -> start)..."
+            )
             try:
                 if self.stop(name):
                     return self.start(name=name)
@@ -183,37 +215,42 @@ class Provider(CloudBaseManager):
                 logger.error(f"Hard reset failed during stop for {name}: {stop_e}")
             return False
 
-    def list(self) -> List[Dict[str, Any]]:
+    def list(self) -> list[dict[str, Any]]:
         """Lists all Oracle VMs."""
         if not self.compute_client:
             return []
         try:
-            compartment_id = self.get_cloud_config(self.cloud_name).get("compartment_id")
+            compartment_id = self.get_cloud_config(self.cloud_name).get(
+                "compartment_id"
+            )
             instances = self.compute_client.list_instances(compartment_id).data
 
             results = []
             for inst in instances:
                 # Get public IP
                 vnic_attachments = self.compute_client.list_vnic_attachments(
-                    compartment_id=compartment_id,
-                    instance_id=inst.id
+                    compartment_id=compartment_id, instance_id=inst.id
                 ).data
                 public_ip = "N/A"
                 if vnic_attachments:
-                    vnic = self.network_client.get_vnic(vnic_attachments[0].vnic_id).data
+                    vnic = self.network_client.get_vnic(
+                        vnic_attachments[0].vnic_id
+                    ).data
                     public_ip = vnic.public_ip
 
-                results.append({
-                    "name": inst.display_name,
-                    "ip": public_ip,
-                    "status": inst.lifecycle_state
-                })
+                results.append(
+                    {
+                        "name": inst.display_name,
+                        "ip": public_ip,
+                        "status": inst.lifecycle_state,
+                    }
+                )
             return results
         except Exception as e:
             logger.error(f"OCI list failed: {e}")
             return []
 
-    def info(self, name: str, kind: str = "vm") -> Dict[str, Any]:
+    def info(self, name: str, kind: str = "vm") -> dict[str, Any]:
         """Gets detailed info for an Oracle VM."""
         if not self.exists(name):
             raise VMResourceError(f"Oracle VM {name} not found")
@@ -227,7 +264,7 @@ class Provider(CloudBaseManager):
                 "ID": inst.id,
                 "Status": inst.lifecycle_state,
                 "Shape": inst.shape,
-                "TimeCreated": inst.time_created
+                "TimeCreated": inst.time_created,
             }
         except Exception as e:
             logger.error(f"OCI info failed for {name}: {e}")
@@ -238,8 +275,10 @@ class Provider(CloudBaseManager):
         try:
             instance_id = self._resolve_instance_id(name)
             vnic_attachments = self.compute_client.list_vnic_attachments(
-                compartment_id=self.get_cloud_config(self.cloud_name).get("compartment_id"),
-                instance_id=instance_id
+                compartment_id=self.get_cloud_config(self.cloud_name).get(
+                    "compartment_id"
+                ),
+                instance_id=instance_id,
             ).data
             if not vnic_attachments:
                 return "Error: No VNIC found for instance."
@@ -268,12 +307,20 @@ class Provider(CloudBaseManager):
                 return inst.id
         raise VMResourceError(f"Could not find Oracle instance with name {name}")
 
-    def validate_config(self) -> Dict[str, List[str]]:
+    def validate_config(self) -> dict[str, builtins.list[str]]:
         errors_map = {}
         config = self.get_cloud_config(self.cloud_name)
         errors = []
 
-        required = ["user", "tenancy", "fingerprint", "region", "key_file", "compartment_id", "subnet_id"]
+        required = [
+            "user",
+            "tenancy",
+            "fingerprint",
+            "region",
+            "key_file",
+            "compartment_id",
+            "subnet_id",
+        ]
         for field in required:
             if not config.get(field):
                 errors.append(f"Missing required field: '{field}'")
@@ -288,17 +335,16 @@ class Provider(CloudBaseManager):
         """
         try:
             import oci
+
             if not self.compute_client:
                 return False
 
-            with open(os.path.expanduser(key_path), 'r') as f:
+            with open(os.path.expanduser(key_path), "r") as f:
                 public_key = f.read()
 
             identity_client = oci.identity.IdentityClient(self.config)
             identity_client.upload_public_key(
-                user_id=self.config["user"],
-                key_body=public_key,
-                key_name=key_name
+                user_id=self.config["user"], key_body=public_key, key_name=key_name
             )
             return True
         except Exception as e:
@@ -311,6 +357,7 @@ class Provider(CloudBaseManager):
         """
         try:
             import oci
+
             if not self.compute_client:
                 return False
 
@@ -328,7 +375,7 @@ class Provider(CloudBaseManager):
             logger.error(f"OCI delete_key failed for {key_name}: {e}")
             return False
 
-    def list_regions(self) -> List[Dict[str, Any]]:
+    def list_regions(self) -> builtins.list[dict[str, Any]]:
         """
         Lists available regions for Oracle Cloud.
         """
@@ -337,6 +384,7 @@ class Provider(CloudBaseManager):
         try:
             # Use the OCI identity client to list regions
             import oci
+
             identity_client = oci.identity.IdentityClient(self.config)
             regions = identity_client.list_regions().data
             return [{"name": r.region_name, "id": r.region_name} for r in regions]
@@ -344,13 +392,14 @@ class Provider(CloudBaseManager):
             logger.error(f"OCI list_regions failed: {e}")
             return []
 
-    def get_provider_info(self) -> Dict[str, Any]:
+    def get_provider_info(self) -> dict[str, Any]:
         """Gets detailed information about the Oracle provider."""
-        import subprocess
 
         version = "OCI SDK"
         try:
-            result = subprocess.run(["oci", "--version"], capture_output=True, text=True)
+            result = subprocess.run(
+                ["oci", "--version"], capture_output=True, text=True
+            )
             if result.returncode == 0:
                 version = result.stdout.strip()
         except Exception:
@@ -366,4 +415,3 @@ class Provider(CloudBaseManager):
                 "region": cloud_config.get("region"),
             },
         }
-

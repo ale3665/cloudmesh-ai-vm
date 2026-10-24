@@ -1,10 +1,8 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from cloudmesh.ai.vm.local.VBoxManager import Provider
-
-
-VM_UUID = "12345678-1234-1234-1234-123456789abc"
-VM_UUID_2 = "abcdef12-3456-7890-abcd-ef1234567890"
 
 
 @pytest.fixture
@@ -16,6 +14,7 @@ def mock_config():
     }
 
 
+
 @pytest.fixture
 def provider(mock_config):
     p = Provider(mock_config)
@@ -25,106 +24,52 @@ def provider(mock_config):
 
 def test_start_success(provider):
     provider._run_command.side_effect = [
-        MagicMock(
-            stdout=f'"vbox-vm" {{{VM_UUID}}}\n',
-            returncode=0,
-        ),
-        MagicMock(
-            stdout="Started",
-            returncode=0,
-        ),
+        MagicMock(stdout='"vbox-vm" {uuid1}\n', returncode=0),
+        MagicMock(stdout="Started", returncode=0),
     ]
 
     assert provider.start(name="vbox-vm") == "vbox-vm"
 
     assert provider._run_command.call_count == 2
-
+    provider._run_command.assert_any_call(["VBoxManage", "list", "vms"])
     provider._run_command.assert_any_call(
-        ["VBoxManage", "list", "vms"]
-    )
-
-    provider._run_command.assert_any_call(
-        [
-            "VBoxManage",
-            "startvm",
-            "vbox-vm",
-            "--type",
-            "headless",
-        ]
+        ["VBoxManage", "startvm", "vbox-vm", "--type", "headless"]
     )
 
 
 def test_stop_success(provider):
     provider._run_command.side_effect = [
-        MagicMock(
-            stdout=f'"vbox-vm" {{{VM_UUID}}}\n',
-            returncode=0,
-        ),
-        MagicMock(
-            stdout="Stopped",
-            returncode=0,
-        ),
+        MagicMock(stdout='"vbox-vm" {uuid1}\n', returncode=0),
+        MagicMock(stdout="Stopped", returncode=0),
     ]
 
     assert provider.stop(name="vbox-vm") is True
 
     assert provider._run_command.call_count == 2
-
+    provider._run_command.assert_any_call(["VBoxManage", "list", "vms"])
     provider._run_command.assert_any_call(
-        ["VBoxManage", "list", "vms"]
-    )
-
-    provider._run_command.assert_any_call(
-        [
-            "VBoxManage",
-            "controlvm",
-            "vbox-vm",
-            "poweroff",
-        ]
+        ["VBoxManage", "controlvm", "vbox-vm", "poweroff"]
     )
 
 
 def test_delete_success(provider):
     provider._run_command.side_effect = [
-        MagicMock(
-            stdout=f'"vbox-vm" {{{VM_UUID}}}\n',
-            returncode=0,
-        ),
-        MagicMock(
-            stdout="Deleted",
-            returncode=0,
-        ),
+        MagicMock(stdout='"vbox-vm" {uuid1}\n', returncode=0),
+        MagicMock(stdout="Deleted", returncode=0),
     ]
 
     assert provider.delete(name="vbox-vm") is True
 
     assert provider._run_command.call_count == 2
-
+    provider._run_command.assert_any_call(["VBoxManage", "list", "vms"])
     provider._run_command.assert_any_call(
-        ["VBoxManage", "list", "vms"]
-    )
-
-    provider._run_command.assert_any_call(
-        [
-            "VBoxManage",
-            "unregistervm",
-            "vbox-vm",
-            "--delete",
-        ]
+        ["VBoxManage", "unregistervm", "vbox-vm", "--delete"]
     )
 
 
 def test_list_parsing(provider):
-    mock_output = (
-        f'"VM 1" {{{VM_UUID}}}\n'
-        f'"VM 2" {{{VM_UUID_2}}}\n'
-    )
-
-    provider._run_command.return_value = MagicMock(
-        stdout=mock_output,
-        returncode=0,
-    )
-
+    mock_output = '"VM 1" {uuid1}\n"VM 2" {uuid2}\n'
+    provider._run_command.return_value = MagicMock(stdout=mock_output, returncode=0)
     vms = provider.list()
 
     assert len(vms) == 2
@@ -140,66 +85,42 @@ def test_list_parsing(provider):
     )
 
 
+
 def test_suspend_success(provider):
     provider._run_command.side_effect = [
-        MagicMock(
-            stdout=f'"vbox-vm" {{{VM_UUID}}}\n',
-            returncode=0,
-        ),
-        MagicMock(
-            stdout="Suspended",
-            returncode=0,
-        ),
+        MagicMock(stdout='"vbox-vm" {uuid1}\n', returncode=0),
+        MagicMock(stdout="Suspended", returncode=0),
     ]
 
     assert provider.suspend(name="vbox-vm") is True
 
     assert provider._run_command.call_count == 2
-
+    provider._run_command.assert_any_call(["VBoxManage", "list", "vms"])
     provider._run_command.assert_any_call(
-        ["VBoxManage", "list", "vms"]
-    )
-
-    provider._run_command.assert_any_call(
-        [
-            "VBoxManage",
-            "controlvm",
-            "vbox-vm",
-            "savestate",
-        ]
+        ["VBoxManage", "controlvm", "vbox-vm", "savestate"]
     )
 
 
 def test_restart_success(provider):
-    with patch.object(
-        provider,
-        "exists",
-        return_value=True,
-    ):
-        provider._run_command.return_value = MagicMock(
-            stdout="",
-            returncode=0,
-        )
+    # 1. stop.exists() -> list()
+    # 2. stop()
+    # 3. start.exists() -> list()
+    # 4. start()
+    provider._run_command.side_effect = [
+        MagicMock(stdout='"vbox-vm" {uuid1}\n', returncode=0),
+        MagicMock(stdout="Stopped", returncode=0),
+        MagicMock(stdout='"vbox-vm" {uuid1}\n', returncode=0),
+        MagicMock(stdout="Started", returncode=0),
+    ]
 
         assert provider.restart(name="vbox-vm") is True
 
-    assert provider._run_command.call_count == 2
-
+    assert (
+        provider._run_command.call_count == 2
+    )  # Only stop and start were called, exists was mocked
     provider._run_command.assert_any_call(
-        [
-            "VBoxManage",
-            "controlvm",
-            "vbox-vm",
-            "poweroff",
-        ]
+        ["VBoxManage", "controlvm", "vbox-vm", "poweroff"]
     )
-
     provider._run_command.assert_any_call(
-        [
-            "VBoxManage",
-            "startvm",
-            "vbox-vm",
-            "--type",
-            "headless",
-        ]
+        ["VBoxManage", "startvm", "vbox-vm", "--type", "headless"]
     )

@@ -1,7 +1,9 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from cloudmesh.ai.vm.openstack.ChameleonManager import Provider
-from cloudmesh.ai.vm.exceptions import VMProviderError
+
 
 @pytest.fixture
 def mock_config():
@@ -13,10 +15,11 @@ def mock_config():
                 "auth_url": "https://api.tacc.chameleoncloud.org/v3",
                 "username": "test-user",
                 "password": "test-password",
-                "domain_name": "Default"
+                "domain_name": "Default",
             }
         }
     }
+
 
 @pytest.fixture
 def provider(mock_config):
@@ -46,7 +49,7 @@ def provider(mock_config):
         "project_name": "test-project",
         "project_id": "proj-123",
         "user_id": "user-456",
-        "allocation": "1000 SU"
+        "allocation": "1000 SU",
     }.get(key)
 
     try:
@@ -56,11 +59,12 @@ def provider(mock_config):
         for p in reversed(patchers):
             p.stop()
 
+
 def test_list_regions(provider):
     with patch("cloudmesh.ai.vm.openstack.ChameleonManager.chi") as mock_chi:
         mock_chi.context.list_sites.return_value = {
             "kvm@tacc": {"description": "TACC KVM site", "status": "active"},
-            "kvm@clemson": {"description": "Clemson KVM site", "status": "active"}
+            "kvm@clemson": {"description": "Clemson KVM site", "status": "active"},
         }
 
         regions = provider.list_regions()
@@ -71,6 +75,7 @@ def test_list_regions(provider):
         assert tacc_region is not None
         assert tacc_region["description"] == "TACC KVM site"
 
+
 def test_create_reservation_success(provider):
     with patch("cloudmesh.ai.vm.openstack.ChameleonManager.chi") as mock_chi:
         mock_chi.lease.lease_duration.return_value = ("2026-10-06", "2026-10-07")
@@ -80,24 +85,21 @@ def test_create_reservation_success(provider):
         mock_chi.lease.create_lease.return_value = mock_lease
 
         result = provider.create_reservation(
-            name="smoke-reservation",
-            node_type="bare_metal",
-            count=1,
-            duration=1
+            name="smoke-reservation", node_type="bare_metal", count=1, duration=1
         )
 
         assert result == "lease-123"
+
 
 def test_create_reservation_no_project(provider):
     provider.config["clouds"]["chameleon"]["project_name"] = None
 
     result = provider.create_reservation(
-        name="smoke-reservation",
-        node_type="bare_metal",
-        count=1
+        name="smoke-reservation", node_type="bare_metal", count=1
     )
 
     assert result is None
+
 
 def test_get_account_info_success(provider):
     # The provider fixture already configures mock_chi.get

@@ -27,11 +27,10 @@ def test_key_scan_passphrase_status(has_passphrase, expected_status):
         "has_passphrase": has_passphrase,
     }
 
-    with patch(
-        "cloudmesh.ai.command.key.scan.KeyManager"
-    ) as mock_manager, patch(
-        "cloudmesh.ai.command.key.scan.render_table"
-    ) as mock_table:
+    with (
+        patch("cloudmesh.ai.command.key.scan.KeyManager") as mock_manager,
+        patch("cloudmesh.ai.command.key.scan.render_table") as mock_table,
+    ):
         mock_manager.return_value.scan_local_keys.return_value = [key]
 
         result = CliRunner().invoke(cmx, ["key", "scan"])

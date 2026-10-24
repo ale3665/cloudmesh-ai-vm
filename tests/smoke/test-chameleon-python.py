@@ -1,28 +1,29 @@
 import os
-import sys
-import yaml
-import uuid
 import subprocess
+import sys
 import tempfile
+import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from pprint import pprint
+
+import yaml
 
 # Add the project root to sys.path so 'src' can be imported
 project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from cloudmesh.ai.vm.state_manager import StateManager
-from cloudmesh.ai.vm.factory import factory
-from cloudmesh.ai.common.stopwatch import StopWatch
-from cloudmesh.ai.common.dotdict import DotDict
-from cloudmesh.ai.common.util import path_expand
-from cloudmesh.ai.common.io import banner
 from benchmark_helper import save_benchmark
+from cloudmesh.ai.common.dotdict import DotDict
+from cloudmesh.ai.common.io import banner
+from cloudmesh.ai.common.stopwatch import StopWatch
+from cloudmesh.ai.common.util import path_expand
+
+from cloudmesh.ai.vm.factory import factory
+from cloudmesh.ai.vm.state_manager import StateManager
 
 # Import Providers for registration
 from src.cloudmesh.ai.vm.openstack.ChameleonManager import Provider as ChameleonProvider
+
 
 def create_temp_config(tmp_path: Path, config: DotDict):
     """Creates a temporary clouds.yaml for the StateManager."""
@@ -39,20 +40,23 @@ def create_temp_config(tmp_path: Path, config: DotDict):
             }
         },
         "username": config.username,
-        "default_cloud": config.cloud
+        "default_cloud": config.cloud,
     }
     with open(config_path, "w", encoding="utf-8") as f:
         yaml.dump(data, f)
     return str(config_path)
+
 
 def generate_ssh_key(tmp_path: Path):
     key_path = tmp_path / "id_rsa"
     pub_key_path = tmp_path / "id_rsa.pub"
     subprocess.run(
         ["ssh-keygen", "-t", "rsa", "-b", "2048", "-f", str(key_path), "-N", ""],
-        check=True, capture_output=True
+        check=True,
+        capture_output=True,
     )
     return str(key_path), str(pub_key_path)
+
 
 def verify_key_presence(provider, vm_name, priv_key_path):
     try:
@@ -65,9 +69,12 @@ def verify_key_presence(provider, vm_name, priv_key_path):
         print(f"Error verifying key: {e}")
         return False
 
+
 def run_smoke_test():
     banner("Loading clouds.yaml configuration for smoke tests")
-    with open(path_expand("~/.config/cloudmesh/clouds.yaml"), "r", encoding="utf-8") as file:
+    with open(
+        path_expand("~/.config/cloudmesh/clouds.yaml"), "r", encoding="utf-8"
+    ) as file:
         data = yaml.load(file, Loader=yaml.FullLoader)
 
     clouds_config = DotDict(data).clouds
@@ -78,17 +85,19 @@ def run_smoke_test():
         sys.exit(1)
 
     # Use a single config DotDict for everything
-    config = DotDict({
-        "name": cloud_name,
-        "cloud": cloud_name,
-        "provider_class": ChameleonProvider,
-        "username": clouds_config.chameleon.username,
-        "image": clouds_config.chameleon.image,
-        "flavor": clouds_config.chameleon.flavor,
-        "key_name": clouds_config.chameleon.key_name,
-        "key_path": clouds_config.chameleon.key_path,
-        "connectivity_strategy": "ssh_execute"
-    })
+    config = DotDict(
+        {
+            "name": cloud_name,
+            "cloud": cloud_name,
+            "provider_class": ChameleonProvider,
+            "username": clouds_config.chameleon.username,
+            "image": clouds_config.chameleon.image,
+            "flavor": clouds_config.chameleon.flavor,
+            "key_name": clouds_config.chameleon.key_name,
+            "key_path": clouds_config.chameleon.key_path,
+            "connectivity_strategy": "ssh_execute",
+        }
+    )
 
     banner(f"Loaded Provider Configuration: {cloud_name}")
     os.environ["OS_CLOUD"] = config.cloud
@@ -109,25 +118,35 @@ def run_smoke_test():
 
         if hasattr(provider, "check_requirements"):
             with StopWatch.timer(f"{cloud_name}_check_reqs"):
-                assert provider.check_requirements() is True, "Requirements check failed"
+                assert provider.check_requirements() is True, (
+                    "Requirements check failed"
+                )
 
         with StopWatch.timer(f"{cloud_name}_get_images"):
-            assert isinstance(provider.get_images(), list), "get_images should return a list"
+            assert isinstance(provider.get_images(), list), (
+                "get_images should return a list"
+            )
 
         with StopWatch.timer(f"{cloud_name}_get_flavors"):
             flavors = provider.get_flavors()
-            assert isinstance(flavors, list) and len(flavors) > 0, "get_flavors should return a non-empty list"
+            assert isinstance(flavors, list) and len(flavors) > 0, (
+                "get_flavors should return a non-empty list"
+            )
 
         with StopWatch.timer(f"{cloud_name}_get_keys"):
             keys = provider.get_keys()
-            assert isinstance(keys, list) and len(keys) > 0, "get_keys should return a non-empty list"
+            assert isinstance(keys, list) and len(keys) > 0, (
+                "get_keys should return a non-empty list"
+            )
 
         # 2. Key Management Tests
         banner("Testing Key Management")
         key_name = f"smoke-key-{uuid.uuid4().hex[:6]}"
 
         with StopWatch.timer(f"{cloud_name}_upload_key"):
-            assert provider.upload_key(pub_key_path, key_name) is True, "upload_key failed"
+            assert provider.upload_key(pub_key_path, key_name) is True, (
+                "upload_key failed"
+            )
 
         with StopWatch.timer(f"{cloud_name}_delete_key"):
             assert provider.delete_key(key_name) is True, "delete_key failed"
@@ -150,11 +169,15 @@ def run_smoke_test():
                 provider.create(vm_name, image=config.image, flavor=config.flavor)
 
             with StopWatch.timer(f"{cloud_name}_verify_vm"):
-                assert provider.exists(vm_name) is True, "VM should exist after creation"
+                assert provider.exists(vm_name) is True, (
+                    "VM should exist after creation"
+                )
 
             with StopWatch.timer(f"{cloud_name}_list_vms"):
                 vms = provider.list()
-                assert any(vm.get("name") == vm_name for vm in vms), "VM should be in the list"
+                assert any(vm.get("name") == vm_name for vm in vms), (
+                    "VM should be in the list"
+                )
 
             print(f"\nSmoke test for {cloud_name} passed successfully!")
 
@@ -166,12 +189,14 @@ def run_smoke_test():
             except Exception:
                 pass
 
+
 if __name__ == "__main__":
     try:
         run_smoke_test()
     except Exception as e:
         print(f"Smoke test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
     sys.exit(0)

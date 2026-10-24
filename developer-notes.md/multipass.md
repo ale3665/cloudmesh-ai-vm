@@ -211,7 +211,9 @@ Instead of running a playbook manually, you use a script that:
 subprocess.run("multipass launch --name node-1", shell=True)
 
 # 2. Discover IP
-ip = subprocess.run("multipass info node-1 | grep IPv4", shell=True, capture_output=True).stdout
+ip = subprocess.run(
+    "multipass info node-1 | grep IPv4", shell=True, capture_output=True
+).stdout
 
 # 3. Generate Inventory
 with open("inventory.ini", "w") as f:

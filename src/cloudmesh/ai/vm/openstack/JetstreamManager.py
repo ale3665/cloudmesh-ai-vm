@@ -1,6 +1,7 @@
 from typing import Any, Optional
 from cloudmesh.ai.vm.openstack.OpenstackManager import OpenstackManager
 
+
 class Provider(OpenstackManager):
     """
     Jetstream implementation of the OpenstackManager.
@@ -38,24 +39,28 @@ class Provider(OpenstackManager):
         }
 
         cloud_config = self.get_cloud_config(self.cloud_name)
-        
+
         flavor = kwargs.get("flavor") or cloud_config.get("flavor") or "m3.medium"
-        num_instances = kwargs.get("num_instances") or cloud_config.get("num_instances", 1)
-        hours_per_day = kwargs.get("hours_per_day") or cloud_config.get("hours_per_day", 8)
-        days_per_week = kwargs.get("days_per_week") or cloud_config.get("days_per_week", 5)
+        num_instances = kwargs.get("num_instances") or cloud_config.get(
+            "num_instances", 1
+        )
+        hours_per_day = kwargs.get("hours_per_day") or cloud_config.get(
+            "hours_per_day", 8
+        )
+        days_per_week = kwargs.get("days_per_week") or cloud_config.get(
+            "days_per_week", 5
+        )
         weeks = kwargs.get("weeks") or cloud_config.get("weeks", 52)
 
         if flavor not in su_costs:
-            return {"value": "Unknown", "unit": "SU", "details": f"Error: Unknown instance flavor: {flavor}"}
+            return {
+                "value": "Unknown",
+                "unit": "SU",
+                "details": f"Error: Unknown instance flavor: {flavor}",
+            }
 
         hourly_cost = su_costs[flavor]
-        total_sus = (
-            hourly_cost
-            * hours_per_day
-            * days_per_week
-            * weeks
-            * num_instances
-        )
+        total_sus = hourly_cost * hours_per_day * days_per_week * weeks * num_instances
 
         details = (
             f"Jetstream Service Unit (SU) Estimation:\n"
@@ -64,8 +69,4 @@ class Provider(OpenstackManager):
             f"{days_per_week} days/week, {weeks} weeks"
         )
 
-        return {
-            "value": total_sus,
-            "unit": "SU",
-            "details": details
-        }
+        return {"value": total_sus, "unit": "SU", "details": details}

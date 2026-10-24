@@ -19,7 +19,9 @@ def get_connection(cloud_name: str) -> openstack.connection.Connection:
         sys.exit(f"❌ Failed to connect to cloud '{cloud_name}': {exc}")
 
 
-def ensure_keypair(conn: openstack.connection.Connection, name: str, pub_key_path: Path) -> str:
+def ensure_keypair(
+    conn: openstack.connection.Connection, name: str, pub_key_path: Path
+) -> str:
     """Ensure keypair exists, creating it from pub_key_path if missing."""
     kp = conn.compute.find_keypair(name)
     if kp:
@@ -65,7 +67,9 @@ def find_security_group(conn: openstack.connection.Connection, identifier: str):
     return sg
 
 
-def allocate_floating_ip(conn: openstack.connection.Connection, external_network_name: str = "public"):
+def allocate_floating_ip(
+    conn: openstack.connection.Connection, external_network_name: str = "public"
+):
     print(f"🌐 Allocating floating IP from '{external_network_name}'...")
     ext_net = conn.network.find_network(external_network_name)
     if not ext_net:
@@ -75,7 +79,16 @@ def allocate_floating_ip(conn: openstack.connection.Connection, external_network
     return fip
 
 
-def create_server(conn: openstack.connection.Connection, name, image, flavor, network, security_group, keypair_name, wait_seconds):
+def create_server(
+    conn: openstack.connection.Connection,
+    name,
+    image,
+    flavor,
+    network,
+    security_group,
+    keypair_name,
+    wait_seconds,
+):
     print(f"🚀 Booting VM '{name}'...")
     server = conn.compute.create_server(
         name=name,
@@ -109,7 +122,13 @@ def attach_floating_ip(conn: openstack.connection.Connection, server, fip):
     print("✅ Floating IP attached.")
 
 
-def test_ssh_connection(user: str, ip: str, priv_key_path: Path, command: str = "uname -a", timeout: int = 120) -> bool:
+def test_ssh_connection(
+    user: str,
+    ip: str,
+    priv_key_path: Path,
+    command: str = "uname -a",
+    timeout: int = 120,
+) -> bool:
     """Wait for SSH to become ready and execute a remote command."""
     print(f"\n🔐 Testing SSH login and running '{command}' on {user}@{ip}...")
     if not priv_key_path.is_file():
@@ -118,11 +137,16 @@ def test_ssh_connection(user: str, ip: str, priv_key_path: Path, command: str = 
 
     ssh_cmd = [
         "ssh",
-        "-i", str(priv_key_path),
-        "-o", "StrictHostKeyChecking=no",
-        "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "ConnectTimeout=5",
-        "-o", "BatchMode=yes",
+        "-i",
+        str(priv_key_path),
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "ConnectTimeout=5",
+        "-o",
+        "BatchMode=yes",
         f"{user}@{ip}",
         command,
     ]
@@ -147,20 +171,49 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Create a Jetstream-2 VM with a public IP using OpenStackSDK."
     )
-    parser.add_argument("--cloud", default="jetstream", help="Cloud entry name in clouds.yaml")
-    parser.add_argument("--name", default="gregor-opensdk-vm", help="Name for the new VM")
+    parser.add_argument(
+        "--cloud", default="jetstream", help="Cloud entry name in clouds.yaml"
+    )
+    parser.add_argument(
+        "--name", default="gregor-opensdk-vm", help="Name for the new VM"
+    )
     parser.add_argument("--image", default="Featured-Ubuntu22", help="Image name or ID")
     parser.add_argument("--flavor", default="m3.small", help="Flavor name or ID")
-    parser.add_argument("--network", default="auto_allocated_network", help="Private network name or ID")
+    parser.add_argument(
+        "--network", default="auto_allocated_network", help="Private network name or ID"
+    )
     parser.add_argument("--secgroup", default="default", help="Security group name/ID")
-    parser.add_argument("--keypair", default="gregor-tmp-key", help="Keypair name to create/use")
-    parser.add_argument("--keyfile", default=str(Path.home() / ".ssh/id_rsa.pub"), help="Public SSH key path")
-    parser.add_argument("--privkey", default=str(Path.home() / ".ssh/id_rsa"), help="Private SSH key path")
-    parser.add_argument("--command", default="uname -a", help="Command to run on the VM via SSH")
-    parser.add_argument("--ssh-timeout", type=int, default=120, help="Seconds to wait for SSH to become ready")
-    parser.add_argument("--user", default="ubuntu", help="Default SSH user for the OS image")
-    parser.add_argument("--ext-net", default="public", help="External network for floating IPs")
-    parser.add_argument("--wait", type=int, default=600, help="Seconds to wait for ACTIVE state")
+    parser.add_argument(
+        "--keypair", default="gregor-tmp-key", help="Keypair name to create/use"
+    )
+    parser.add_argument(
+        "--keyfile",
+        default=str(Path.home() / ".ssh/id_rsa.pub"),
+        help="Public SSH key path",
+    )
+    parser.add_argument(
+        "--privkey",
+        default=str(Path.home() / ".ssh/id_rsa"),
+        help="Private SSH key path",
+    )
+    parser.add_argument(
+        "--command", default="uname -a", help="Command to run on the VM via SSH"
+    )
+    parser.add_argument(
+        "--ssh-timeout",
+        type=int,
+        default=120,
+        help="Seconds to wait for SSH to become ready",
+    )
+    parser.add_argument(
+        "--user", default="ubuntu", help="Default SSH user for the OS image"
+    )
+    parser.add_argument(
+        "--ext-net", default="public", help="External network for floating IPs"
+    )
+    parser.add_argument(
+        "--wait", type=int, default=600, help="Seconds to wait for ACTIVE state"
+    )
     return parser.parse_args()
 
 

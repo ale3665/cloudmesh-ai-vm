@@ -1,9 +1,11 @@
-import click
-import os
 import glob
-from pathlib import Path
+import os
+
+import click
+
 from cloudmesh.ai.command._shared.context import console, get_active_provider
-from cloudmesh.ai.command._shared.exceptions import handle_errors, VMCommandError
+from cloudmesh.ai.command._shared.exceptions import VMCommandError, handle_errors
+
 
 @click.command()
 @click.pass_context
@@ -42,7 +44,9 @@ def upload_key(ctx: click.Context, key_path: str = None, name: str = None):
                         "as an argument or configure it in clouds.yaml."
                     )
                 else:
-                    raise VMCommandError(f"No public keys found in {ssh_dir}. Please provide a key_path.")
+                    raise VMCommandError(
+                        f"No public keys found in {ssh_dir}. Please provide a key_path."
+                    )
 
     key_path = os.path.expanduser(key_path)
 
@@ -54,5 +58,6 @@ def upload_key(ctx: click.Context, key_path: str = None, name: str = None):
         console.print(f"Successfully uploaded key [bold green]{key_path}[/bold green].")
     else:
         raise VMCommandError(f"Failed to upload key {key_path}.")
+
 
 cmd = upload_key

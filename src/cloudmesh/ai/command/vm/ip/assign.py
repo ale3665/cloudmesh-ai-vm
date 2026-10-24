@@ -1,6 +1,8 @@
 import click
+
 from .._shared.context import console, get_active_provider
-from .._shared.exceptions import handle_errors, VMCommandError
+from .._shared.exceptions import VMCommandError, handle_errors
+
 
 @click.command()
 @click.pass_context
@@ -11,8 +13,11 @@ def assign_ip(ctx: click.Context, name: str):
     provider = get_active_provider(ctx)
     ip = provider.assign_floating_ip(name)
     if ip:
-        console.print(f"Assigned floating IP [bold green]{ip}[/bold green] to VM {name}.")
+        console.print(
+            f"Assigned floating IP [bold green]{ip}[/bold green] to VM {name}."
+        )
     else:
         raise VMCommandError(f"Failed to assign a floating IP to VM {name}.")
+
 
 cmd = assign_ip

@@ -1,9 +1,10 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from cloudmesh.ai.vm.aws.AwsManager import Provider as AwsProvider
 from cloudmesh.ai.vm.azure.AzureManager import Provider as AzureProvider
 from cloudmesh.ai.vm.google.GoogleManager import Provider as GoogleProvider
-from cloudmesh.ai.vm.exceptions import VMProviderError
 
 # Mock configuration for all hyperscalers
 MOCK_CONFIG = {
@@ -22,9 +23,10 @@ MOCK_CONFIG = {
         "google": {
             "project_id": "test-project",
             "private_key": "/path/to/key.json",
-        }
+        },
     }
 }
+
 
 class TestHyperscalers:
     """
@@ -39,9 +41,7 @@ class TestHyperscalers:
         provider = AwsProvider(MOCK_CONFIG)
 
         mock_driver_class.assert_called_once_with(
-            access_key="test-access",
-            secret_key="test-secret",
-            region="us-east-1"
+            access_key="test-access", secret_key="test-secret", region="us-east-1"
         )
         assert provider.cloud_name == "aws"
 
@@ -66,7 +66,7 @@ class TestHyperscalers:
             tenant_id="test-tenant",
             subscription_id="test-sub",
             client_id="test-client",
-            client_secret="test-secret"
+            client_secret="test-secret",
         )
         assert provider.cloud_name == "azure"
 
@@ -85,8 +85,7 @@ class TestHyperscalers:
         provider = GoogleProvider(MOCK_CONFIG)
 
         mock_driver_class.assert_called_once_with(
-            project_id="test-project",
-            private_key="/path/to/key.json"
+            project_id="test-project", private_key="/path/to/key.json"
         )
         assert provider.cloud_name == "google"
 
@@ -94,7 +93,9 @@ class TestHyperscalers:
         provider = GoogleProvider(MOCK_CONFIG)
 
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="google-cloud-sdk 400.0.0\nOther info")
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout="google-cloud-sdk 400.0.0\nOther info"
+            )
             info = provider.get_provider_info()
 
             assert info["provider"] == "Google"
@@ -102,7 +103,9 @@ class TestHyperscalers:
             assert info["config"]["project_id"] == "test-project"
 
     # --- Common Logic Tests (wait_for_status) ---
-    @pytest.mark.parametrize("provider_cls", [AwsProvider, AzureProvider, GoogleProvider])
+    @pytest.mark.parametrize(
+        "provider_cls", [AwsProvider, AzureProvider, GoogleProvider]
+    )
     def test_wait_for_status_success(self, provider_cls):
         provider = provider_cls(MOCK_CONFIG)
         provider.driver = MagicMock()
@@ -112,9 +115,14 @@ class TestHyperscalers:
         mock_node.state = "running"
         provider.driver.get_node.return_value = mock_node
 
-        assert provider.wait_for_status(name="test-vm", target_status="running", timeout=1) is True
+        assert (
+            provider.wait_for_status(name="test-vm", target_status="running", timeout=1)
+            is True
+        )
 
-    @pytest.mark.parametrize("provider_cls", [AwsProvider, AzureProvider, GoogleProvider])
+    @pytest.mark.parametrize(
+        "provider_cls", [AwsProvider, AzureProvider, GoogleProvider]
+    )
     def test_wait_for_status_timeout(self, provider_cls):
         provider = provider_cls(MOCK_CONFIG)
         provider.driver = MagicMock()
@@ -125,4 +133,7 @@ class TestHyperscalers:
         provider.driver.get_node.return_value = mock_node
 
         # Short timeout for testing
-        assert provider.wait_for_status(name="test-vm", target_status="running", timeout=1) is False
+        assert (
+            provider.wait_for_status(name="test-vm", target_status="running", timeout=1)
+            is False
+        )

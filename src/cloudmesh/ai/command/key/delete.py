@@ -1,6 +1,8 @@
 import click
+
 from cloudmesh.ai.command._shared.context import console, get_active_provider
 from cloudmesh.ai.command._shared.exceptions import handle_errors
+
 
 @click.command()
 @click.pass_context
@@ -13,5 +15,6 @@ def delete_key(ctx: click.Context, key_name: str):
         console.print(f"Successfully deleted key [bold green]{key_name}[/bold green].")
     else:
         raise VMCommandError(f"Failed to delete key {key_name}.")
+
 
 cmd = delete_key

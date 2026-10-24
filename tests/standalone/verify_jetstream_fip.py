@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import sys
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from cloudmesh.ai.vm.openstack.OpenstackManager import OpenstackManager
+
 
 def test_get_floating_ip_libcloud_only():
     """
@@ -14,7 +15,7 @@ def test_get_floating_ip_libcloud_only():
     config.clouds = {"jetstream": {"auth": {"auth_url": "http://fake"}}}
 
     # Initialize manager (mocking _get_driver to avoid real auth)
-    with patch.object(OpenstackManager, '_get_driver', return_value=MagicMock()):
+    with patch.object(OpenstackManager, "_get_driver", return_value=MagicMock()):
         mgr = OpenstackManager(config, cloud_name="jetstream")
 
         # Case 1: Driver has the public IP
@@ -22,11 +23,15 @@ def test_get_floating_ip_libcloud_only():
         mock_node.name = "test-vm"
         mock_node.public_ips = ["1.2.3.4"]
 
-        with patch.object(mgr, '_find_node', return_value=mock_node):
+        with patch.object(mgr, "_find_node", return_value=mock_node):
             # We patch _run_cli_command to RAISE an error if called.
             # If the code correctly uses libcloud, it should return 1.2.3.4
             # before ever reaching the CLI fallback.
-            with patch.object(mgr, '_run_cli_command', side_effect=RuntimeError("CLI should not be called!")):
+            with patch.object(
+                mgr,
+                "_run_cli_command",
+                side_effect=RuntimeError("CLI should not be called!"),
+            ):
                 fip = mgr._get_floating_ip("test-vm")
                 print(f"Result (Driver has IP): {fip}")
                 assert fip == "1.2.3.4", "Should have retrieved IP from libcloud driver"
@@ -36,14 +41,19 @@ def test_get_floating_ip_libcloud_only():
         mock_node_no_ip.name = "test-vm"
         mock_node_no_ip.public_ips = []
 
-        with patch.object(mgr, '_find_node', return_value=mock_node_no_ip):
+        with patch.object(mgr, "_find_node", return_value=mock_node_no_ip):
             # Here we expect it to hit the CLI fallback and fail (because we mock it to fail)
-            with patch.object(mgr, '_run_cli_command', side_effect=RuntimeError("CLI failed as expected")):
+            with patch.object(
+                mgr,
+                "_run_cli_command",
+                side_effect=RuntimeError("CLI failed as expected"),
+            ):
                 fip = mgr._get_floating_ip("test-vm")
                 print(f"Result (Driver lacks IP, CLI fails): {fip}")
                 assert fip is None, "Should return None when both driver and CLI fail"
 
     print("\n✅ Verification successful: _get_floating_ip uses libcloud first.")
+
 
 if __name__ == "__main__":
     try:

@@ -1,15 +1,16 @@
-from typing import Dict, Type, Any
+from typing import Any, Dict, Type
 
 # Move imports inside functions or at the bottom to avoid circular imports
 # since OpenstackManager imports from .providers_utils which calls register_providers()
+
 
 def get_provider_classes():
     """
     Load VM providers independently so optional dependencies belonging to
     one provider do not prevent other providers from being used.
     """
-    from importlib import import_module
     import logging
+    from importlib import import_module
 
     providers = {
         "multipass": ("cloudmesh.ai.vm.local.MultipassManager", "Provider"),
@@ -34,26 +35,68 @@ def get_provider_classes():
 
     return classes
 
+
 PROVIDER_MAP = get_provider_classes()
 
 PROVIDER_METADATA = {
-    "multipass": {"lifecycle": "🟢", "remote_exec": "🟢 (Agent)", "status": "Fully Functional"},
-    "lima": {"lifecycle": "🟢", "remote_exec": "🟢 (SSH)", "status": "Fully Functional"},
-    "openstack": {"lifecycle": "🟢", "remote_exec": "🟢 (SSH)", "status": "Fully Functional"},
-    "jetstream": {"lifecycle": "🟢", "remote_exec": "🟢 (SSH)", "status": "Fully Functional"},
-    "chameleon": {"lifecycle": "🟢", "remote_exec": "🟢 (SSH)", "status": "Fully Functional"},
-    "wsl2": {"lifecycle": "🟢", "remote_exec": "🟢 (Direct)", "status": "Fully Functional"},
-    "vbox": {"lifecycle": "🟢", "remote_exec": "🟢 (GuestCtrl)", "status": "Fully Functional"},
-    "aws": {"lifecycle": "🟢", "remote_exec": "🟢 (SSH)", "status": "Fully Functional (via Libcloud)"},
-    "azure": {"lifecycle": "🟢", "remote_exec": "🟢 (SSH)", "status": "Fully Functional (via Libcloud)"},
-    "google": {"lifecycle": "🟢", "remote_exec": "🟢 (SSH)", "status": "Fully Functional (via Libcloud)"},
+    "multipass": {
+        "lifecycle": "🟢",
+        "remote_exec": "🟢 (Agent)",
+        "status": "Fully Functional",
+    },
+    "lima": {
+        "lifecycle": "🟢",
+        "remote_exec": "🟢 (SSH)",
+        "status": "Fully Functional",
+    },
+    "openstack": {
+        "lifecycle": "🟢",
+        "remote_exec": "🟢 (SSH)",
+        "status": "Fully Functional",
+    },
+    "jetstream": {
+        "lifecycle": "🟢",
+        "remote_exec": "🟢 (SSH)",
+        "status": "Fully Functional",
+    },
+    "chameleon": {
+        "lifecycle": "🟢",
+        "remote_exec": "🟢 (SSH)",
+        "status": "Fully Functional",
+    },
+    "wsl2": {
+        "lifecycle": "🟢",
+        "remote_exec": "🟢 (Direct)",
+        "status": "Fully Functional",
+    },
+    "vbox": {
+        "lifecycle": "🟢",
+        "remote_exec": "🟢 (GuestCtrl)",
+        "status": "Fully Functional",
+    },
+    "aws": {
+        "lifecycle": "🟢",
+        "remote_exec": "🟢 (SSH)",
+        "status": "Fully Functional (via Libcloud)",
+    },
+    "azure": {
+        "lifecycle": "🟢",
+        "remote_exec": "🟢 (SSH)",
+        "status": "Fully Functional (via Libcloud)",
+    },
+    "google": {
+        "lifecycle": "🟢",
+        "remote_exec": "🟢 (SSH)",
+        "status": "Fully Functional (via Libcloud)",
+    },
 }
+
 
 def register_providers():
     """
     Registers providers.
     """
-    pass
+
 
 def get_provider(cloud_name: str):
     """
@@ -72,6 +115,7 @@ def get_provider(cloud_name: str):
 
     try:
         from cloudmesh.ai.command.vm._shared.context import state
+
         if state.config:
             config = state.config
         else:
@@ -82,4 +126,6 @@ def get_provider(cloud_name: str):
     try:
         return provider_class(config=config, cloud_name=cloud_name)
     except Exception as e:
-        raise VMProviderError(f"Failed to instantiate provider {provider_class.__name__} for cloud {cloud_name}: {e}") from e
+        raise VMProviderError(
+            f"Failed to instantiate provider {provider_class.__name__} for cloud {cloud_name}: {e}"
+        ) from e

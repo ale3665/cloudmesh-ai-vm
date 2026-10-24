@@ -1,11 +1,13 @@
-import click
 import json
 import os
-import webbrowser
+
+import click
+
 from cloudmesh.ai.command._shared.context import console
 from cloudmesh.ai.command._shared.exceptions import handle_errors
 from cloudmesh.ai.command._shared.ui import render_table
 from cloudmesh.ai.vm.key_manager import KeyManager
+
 
 @click.command()
 @click.option("--json", "as_json", is_flag=True, help="Output in JSON format")
@@ -30,27 +32,56 @@ def scan(as_json: bool):
         if path.startswith(home):
             path = path.replace(home, "~", 1)
         passphrase_status = (
-            "Yes" if k["has_passphrase"] is True
-            else "No" if k["has_passphrase"] is False
+            "Yes"
+            if k["has_passphrase"] is True
+            else "No"
+            if k["has_passphrase"] is False
             else "Unknown"
         )
-        rows.append([
-            path, k["type"], k["sha256"], k["md5"],
-            k["comment"], passphrase_status,
-        ])
+        rows.append(
+            [
+                path,
+                k["type"],
+                k["sha256"],
+                k["md5"],
+                k["comment"],
+                passphrase_status,
+            ]
+        )
 
-    render_table("Local SSH Keys", ["Path", "Type", "Fingerprint (SHA256)", "Fingerprint (MD5)", "Comment", "Passphrase"], rows)
+    render_table(
+        "Local SSH Keys",
+        [
+            "Path",
+            "Type",
+            "Fingerprint (SHA256)",
+            "Fingerprint (MD5)",
+            "Comment",
+            "Passphrase",
+        ],
+        rows,
+    )
 
     # Identify keys without passphrases
-    unprotected_keys = [k["path"].replace(home, "~", 1) if k["path"].startswith(home) else k["path"]
-                        for k in keys if k["has_passphrase"] is False]
+    unprotected_keys = [
+        k["path"].replace(home, "~", 1) if k["path"].startswith(home) else k["path"]
+        for k in keys
+        if k["has_passphrase"] is False
+    ]
 
     if unprotected_keys:
-        console.print("\n[bold red]The following keys are unprotected (no passphrase):[/bold red]")
+        console.print(
+            "\n[bold red]The following keys are unprotected (no passphrase):[/bold red]"
+        )
         for key_path in unprotected_keys:
             console.print(f" - [red]{key_path}[/red]")
 
-        console.print("\n[bold yellow]WARNING:[/bold yellow] The keys listed above are local SSH keys. They [bold red]must not[/bold red] be used for cloud providers such as [bold]AWS, Azure, Google, Chameleon, or Jetstream[/bold].")
-        console.print("For cloud providers, it is strongly recommended to [bold]create a dedicated key with a passphrase[/bold] and manage it using [bold]ssh-agent[/bold] for better security.")
+        console.print(
+            "\n[bold yellow]WARNING:[/bold yellow] The keys listed above are local SSH keys. They [bold red]must not[/bold red] be used for cloud providers such as [bold]AWS, Azure, Google, Chameleon, or Jetstream[/bold]."
+        )
+        console.print(
+            "For cloud providers, it is strongly recommended to [bold]create a dedicated key with a passphrase[/bold] and manage it using [bold]ssh-agent[/bold] for better security."
+        )
+
 
 cmd = scan

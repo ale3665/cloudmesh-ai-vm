@@ -42,11 +42,14 @@ import importlib
 from abc import ABC, abstractmethod
 from typing import Any
 
+
 class BaseProvider(ABC):
     """Abstract Base Class for all Cloud Providers."""
+
     @abstractmethod
     def connect(self) -> Any:
         pass
+
 
 def check_dependency(module_name: str, extra_name: str):
     """Ensures required dependency is installed, or gives clear install instructions."""
@@ -66,16 +69,20 @@ Providers perform the lazy-import inside their `__init__` or `connect` methods.
 ```python
 from mycloudpkg.providers.base import BaseProvider, check_dependency
 
+
 class AWSProvider(BaseProvider):
     def __init__(self, config, **kwargs):
         # Dynamically verify and load boto3
         self.boto3 = check_dependency("boto3", "boto")
-        self.region = kwargs.get("region") or config.get("aws", "region", default="us-east-1")
+        self.region = kwargs.get("region") or config.get(
+            "aws", "region", default="us-east-1"
+        )
         self.client = None
 
     def connect(self):
         # Session initialization using lazy-loaded boto3
         import boto3
+
         session = boto3.Session(region_name=self.region)
         self.client = session.client("ec2")
         return self.client
@@ -89,6 +96,7 @@ The `CloudManager` acts as the orchestrator, mapping provider keys to their resp
 import importlib
 from typing import Dict, List, Type
 from mycloudpkg.providers.base import BaseProvider
+
 
 class CloudManager:
     _PROVIDER_MAP = {
@@ -114,7 +122,9 @@ class CloudManager:
             provider_class: Type[BaseProvider] = getattr(module, class_name)
 
             provider_kwargs = config_overrides.get(key_lower, {})
-            self.active_providers[key_lower] = provider_class(config=self.config, **provider_kwargs)
+            self.active_providers[key_lower] = provider_class(
+                config=self.config, **provider_kwargs
+            )
 
     def get_provider(self, name: str) -> BaseProvider:
         return self.active_providers[name.lower()]
@@ -139,12 +149,18 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from mycloudpkg.security import SecretVault
 
+
 class Config:
-    def __init__(self, config_path: Optional[str] = None, passphrase: Optional[str] = None):
+    def __init__(
+        self, config_path: Optional[str] = None, passphrase: Optional[str] = None
+    ):
         self.data: Dict[str, Any] = {}
         self.passphrase = passphrase or os.environ.get("CLOUDMESH_KEY")
-        self.config_path = Path(config_path).expanduser().resolve() if config_path \
-                           else Path("~/.cloudmesh/cloudmesh.yaml").expanduser().resolve()
+        self.config_path = (
+            Path(config_path).expanduser().resolve()
+            if config_path
+            else Path("~/.cloudmesh/cloudmesh.yaml").expanduser().resolve()
+        )
         self._load_yaml()
 
     def _load_yaml(self) -> None:
@@ -152,13 +168,25 @@ class Config:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 self.data = yaml.safe_load(f) or {}
 
-    def get(self, cloud_name: str, key: str, env_var: Optional[str] = None, default: Any = None) -> Any:
+    def get(
+        self,
+        cloud_name: str,
+        key: str,
+        env_var: Optional[str] = None,
+        default: Any = None,
+    ) -> Any:
         # 1. Try Keyring
         val = SecretVault.get_from_keyring(cloud_name, key)
-        if val: return val
+        if val:
+            return val
 
         # 2. Try YAML (with decryption)
-        cloud_cfg = self.data.get("cloudmesh", {}).get("cloud", {}).get(cloud_name, {}).get("credentials", {})
+        cloud_cfg = (
+            self.data.get("cloudmesh", {})
+            .get("cloud", {})
+            .get(cloud_name, {})
+            .get("credentials", {})
+        )
         if key in cloud_cfg and cloud_cfg[key] is not None:
             raw_val = str(cloud_cfg[key])
             if raw_val.startswith("enc:"):
@@ -183,6 +211,7 @@ import base64
 import hashlib
 from cryptography.fernet import Fernet
 
+
 class SecretVault:
     SERVICE_NAME = "cloudmesh"
 
@@ -198,7 +227,8 @@ class SecretVault:
 
     @classmethod
     def decrypt_value(cls, encrypted_str: str, passphrase: Optional[str] = None) -> str:
-        if not encrypted_str.startswith("enc:"): return encrypted_str
+        if not encrypted_str.startswith("enc:"):
+            return encrypted_str
         key_source = passphrase or os.environ.get("CLOUDMESH_KEY")
         fernet = Fernet(cls._get_fernet_key(key_source))
         return fernet.decrypt(encrypted_str[4:].encode("utf-8")).decode("utf-8")

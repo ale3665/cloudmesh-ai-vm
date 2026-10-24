@@ -1,55 +1,56 @@
-import os
-import yaml
-import pytest
-import uuid
-import time
-import subprocess
 import shutil
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Callable
+import subprocess
+import time
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
-
-from cloudmesh.ai.vm.state_manager import StateManager
-from cloudmesh.ai.vm.factory import factory
+import pytest
+import yaml
+from cloudmesh.ai.common.dotdict import DotDict
 from cloudmesh.ai.common.stopwatch import StopWatch
-from tests.integration.test_wsl2_with_credentials import provider
-from tests.smoke.benchmark_helper import save_benchmark
 
-# Import Providers for registration
-from src.cloudmesh.ai.vm.openstack.ChameleonManager import Provider as ChameleonProvider
-from src.cloudmesh.ai.vm.openstack.OpenstackManager import OpenstackManager
+from cloudmesh.ai.vm.factory import factory
+from cloudmesh.ai.vm.state_manager import StateManager
 from src.cloudmesh.ai.vm.local.LimaManager import Provider as LimaProvider
 from src.cloudmesh.ai.vm.local.MultipassManager import Provider as MultipassProvider
 from src.cloudmesh.ai.vm.local.VBoxManager import Provider as VBoxProvider
 from src.cloudmesh.ai.vm.local.Wsl2Manager import Provider as Wsl2Provider
 
-from cloudmesh.ai.common.dotdict import DotDict
+# Import Providers for registration
+from src.cloudmesh.ai.vm.openstack.ChameleonManager import Provider as ChameleonProvider
+from src.cloudmesh.ai.vm.openstack.OpenstackManager import OpenstackManager
+from tests.smoke.benchmark_helper import save_benchmark
+
 
 @dataclass
 class ProviderTestConfig:
     name: str
     provider_class: Any
-    cloud_config: Dict[str, Any]
+    cloud_config: dict[str, Any]
     running_status: str = "Running"
     stopped_status: str = "Stopped"
-    connectivity_strategy: str = "run_command"  # run_command, ssh_execute, multipass_exec
+    connectivity_strategy: str = (
+        "run_command"  # run_command, ssh_execute, multipass_exec
+    )
     has_shelve: bool = False
-    skip_condition: Optional[Callable[[], bool]] = None
+    skip_condition: Callable[[], bool] | None = None
     # Custom hooks for provider-specific verification
-    custom_verify_key: Optional[Callable[[Any, str, str, str], bool]] = None
+    custom_verify_key: Callable[[Any, str, str, str], bool] | None = None
+
 
 # --- Connectivity & Key Verification Strategies ---
+
 
 def verify_connectivity_run_command(provider, vm_name):
     hostname = provider.run_command(vm_name, "hostname")
     return hostname is not None and "Error" not in hostname
 
-<<<<<<< HEAD
-def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path):
-=======
-def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path, retries=12, delay=10):
-    import time
->>>>>>> dev2
+
+def verify_connectivity_ssh_execute(
+    provider, vm_name, priv_key_path, retries=12, delay=10
+):
     info = provider.info(vm_name)
     ip = info.get("FloatingIP") or info.get("ip") or info.get("address")
     if not ip:
@@ -75,15 +76,18 @@ def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path, retries=12
     return False
 =======
     user = provider.get_cloud_config(provider.cloud_name).get("username", "ubuntu")
-    
+
     for attempt in range(retries):
         hostname = provider._execute_ssh_command(ip, user, priv_key_path, "hostname")
         if hostname and "Error" not in hostname:
             return True
-        print(f"SSH service not ready yet (attempt {attempt+1}/{retries}), waiting {delay}s...")
+        print(
+            f"SSH service not ready yet (attempt {attempt + 1}/{retries}), waiting {delay}s..."
+        )
         time.sleep(delay)
-        
+
     return False
+
 
 # def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path):
 #     # This is for providers that might not have run_command but have _execute_ssh_command
@@ -96,10 +100,14 @@ def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path, retries=12
 #     return "Error" not in hostname
 >>>>>>> dev2
 
+
 def verify_connectivity_multipass_exec(provider, vm_name):
     # Multipass uses a specific CLI execution
-    result = subprocess.run(["multipass", "exec", vm_name, "--", "hostname"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["multipass", "exec", vm_name, "--", "hostname"], capture_output=True, text=True
+    )
     return result.returncode == 0
+
 
 def verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, strategy):
     with open(pub_key_path, "r") as f:
@@ -122,17 +130,23 @@ def verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, strategy
         return "SSH Error" not in result
 
     elif strategy == "multipass_exec":
-        result = subprocess.run(["multipass", "exec", vm_name, "--", "bash", "-c", verify_cmd], capture_output=True)
+        result = subprocess.run(
+            ["multipass", "exec", vm_name, "--", "bash", "-c", verify_cmd],
+            capture_output=True,
+        )
         return result.returncode == 0
 
     return False
 
-import yaml
+
 from pprint import pprint
+
 from cloudmesh.ai.common.util import path_expand
 
 # Open the file normally, then pass it to yaml.load with the Loader argument
-with open(path_expand("~/.config/cloudmesh/clouds.yaml"), "r", encoding="utf-8") as file:
+with open(
+    path_expand("~/.config/cloudmesh/clouds.yaml"), "r", encoding="utf-8"
+) as file:
     data = yaml.load(file, Loader=yaml.FullLoader)
 
 # Now 'data' is a standard Python dictionary
@@ -141,23 +155,20 @@ pprint(data)
 config = DotDict(data)
 
 
-
 PROVIDER_CONFIGS = [
     ProviderTestConfig(
         name="chameleon",
         provider_class=ChameleonProvider,
-<<<<<<< HEAD
-        cloud_config={"image": "CC-Ubuntu22.04", "flavor": "m1.small"},
-=======
-        cloud_config={"image":  config.clouds.chameleon.image, 
-                      "flavor": config.clouds.chameleon.flavor,
-                      "username": config.clouds.chameleon.username, 
-                      "key_name": config.clouds.chameleon.key_name,
-                      "key_path": config.clouds.chameleon.key_path},
->>>>>>> dev2
+        cloud_config={
+            "image": config.clouds.chameleon.image,
+            "flavor": config.clouds.chameleon.flavor,
+            "username": config.clouds.chameleon.username,
+            "key_name": config.clouds.chameleon.key_name,
+            "key_path": config.clouds.chameleon.key_path,
+        },
         running_status="active",
-        stopped_status="SHUTOFF",
-        connectivity_strategy="ssh_execute"
+        stopped_status="stopped",
+        connectivity_strategy="ssh_execute",
     ),
     ProviderTestConfig(
         name="jetstream",
@@ -166,7 +177,7 @@ PROVIDER_CONFIGS = [
         running_status="active",
         stopped_status="Stopped",
         connectivity_strategy="run_command",
-        skip_condition=lambda: not shutil.which("openstack")
+        skip_condition=lambda: not shutil.which("openstack"),
     ),
     ProviderTestConfig(
         name="lima",
@@ -174,7 +185,7 @@ PROVIDER_CONFIGS = [
         cloud_config={"image": "ubuntu-22.04"},
         running_status="Running",
         stopped_status="Stopped",
-        connectivity_strategy="run_command"
+        connectivity_strategy="run_command",
     ),
     ProviderTestConfig(
         name="multipass",
@@ -183,7 +194,7 @@ PROVIDER_CONFIGS = [
         running_status="Running",
         stopped_status="Stopped",
         connectivity_strategy="multipass_exec",
-        has_shelve=True
+        has_shelve=True,
     ),
     ProviderTestConfig(
         name="vbox",
@@ -191,7 +202,7 @@ PROVIDER_CONFIGS = [
         cloud_config={"image": "ubuntu-22.04"},
         running_status="Running",
         stopped_status="Stopped",
-        connectivity_strategy="run_command"
+        connectivity_strategy="run_command",
     ),
     ProviderTestConfig(
         name="wsl2",
@@ -200,16 +211,17 @@ PROVIDER_CONFIGS = [
             "rootfs": "C:\\path\\to\\rootfs.tar",
             "install_dir": "C:\\WSL_Smoke",
             "wsl_username": "smoke_user",
-            "host_username": "smoke_host"
+            "host_username": "smoke_host",
         },
         running_status="Running",
         stopped_status="Stopped",
         connectivity_strategy="run_command",
-        skip_condition=lambda: not (shutil.which("wsl.exe") or shutil.which("wsl"))
+        skip_condition=lambda: not (shutil.which("wsl.exe") or shutil.which("wsl")),
     ),
 ]
 
 # --- Fixtures ---
+
 
 @pytest.fixture
 def ssh_key(tmp_path):
@@ -217,11 +229,13 @@ def ssh_key(tmp_path):
     pub_key_path = tmp_path / "id_rsa.pub"
     subprocess.run(
         ["ssh-keygen", "-t", "rsa", "-b", "2048", "-f", str(key_path), "-N", ""],
-        check=True, capture_output=True
+        check=True,
+        capture_output=True,
     )
     return str(key_path), str(pub_key_path)
 
-def create_temp_config(tmp_path, provider_cfg, pub_key_path=None):
+
+def create_temp_config(tmp_path, provider_cfg):
     config_dir = tmp_path / ".config" / "cloudmesh"
     config_dir.mkdir(parents=True)
     config_file = config_dir / "clouds.yaml"
@@ -238,7 +252,7 @@ def create_temp_config(tmp_path, provider_cfg, pub_key_path=None):
 =======
             provider_cfg.name: {
                 "username": "smoke_test_user",
-                **provider_cfg.cloud_config
+                **provider_cfg.cloud_config,
             }
 >>>>>>> dev2
         }
@@ -249,7 +263,9 @@ def create_temp_config(tmp_path, provider_cfg, pub_key_path=None):
 
     return str(config_file)
 
+
 # --- Unified Test ---
+
 
 @pytest.mark.parametrize("provider_cfg", PROVIDER_CONFIGS, ids=lambda x: x.name)
 def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
@@ -286,7 +302,7 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
     # VM Name generation
     cloud_config = provider.get_cloud_config(provider_cfg.name)
     image_name = cloud_config.get("image", "")
-    
+
     if image_name.startswith("CC"):
         raw_username = "cc"
     else:
@@ -310,7 +326,12 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
 
         # Wait for running status
         with StopWatch.timer(f"{provider_cfg.name}_wait_running"):
-            assert provider.wait_for_status(vm_name, provider_cfg.running_status, timeout=600) is True
+            assert (
+                provider.wait_for_status(
+                    vm_name, provider_cfg.running_status, timeout=600
+                )
+                is True
+            )
 
         # 2. Connectivity Check
         with StopWatch.timer(f"{provider_cfg.name}_connectivity"):
@@ -321,30 +342,57 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
             elif provider_cfg.connectivity_strategy == "multipass_exec":
                 assert verify_connectivity_multipass_exec(provider, vm_name)
             else:
-                pytest.fail(f"Unknown connectivity strategy: {provider_cfg.connectivity_strategy}")
+                pytest.fail(
+                    f"Unknown connectivity strategy: {provider_cfg.connectivity_strategy}"
+                )
 
         # 3. SSH Key Management
         with StopWatch.timer(f"{provider_cfg.name}_upload_key"):
             assert provider.upload_key(pub_key_path, "smoke-key", vm_name) is True
 
         with StopWatch.timer(f"{provider_cfg.name}_verify_key"):
-            assert verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, provider_cfg.connectivity_strategy) is True
+            assert (
+                verify_key_presence(
+                    provider,
+                    vm_name,
+                    pub_key_path,
+                    priv_key_path,
+                    provider_cfg.connectivity_strategy,
+                )
+                is True
+            )
 
         with StopWatch.timer(f"{provider_cfg.name}_delete_key"):
             assert provider.delete_key("smoke-key", vm_name) is True
 
         with StopWatch.timer(f"{provider_cfg.name}_verify_key_deleted"):
             # We check that the key is NOT present
-            assert not verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, provider_cfg.connectivity_strategy)
+            assert not verify_key_presence(
+                provider,
+                vm_name,
+                pub_key_path,
+                priv_key_path,
+                provider_cfg.connectivity_strategy,
+            )
 
         # 4. Provider-specific features (e.g. Shelve)
         if provider_cfg.has_shelve:
             with StopWatch.timer(f"{provider_cfg.name}_shelve"):
                 assert provider.shelve(vm_name) is True
-                assert provider.wait_for_status(vm_name, provider_cfg.stopped_status, timeout=60) is True
+                assert (
+                    provider.wait_for_status(
+                        vm_name, provider_cfg.stopped_status, timeout=60
+                    )
+                    is True
+                )
             with StopWatch.timer(f"{provider_cfg.name}_unshelve"):
                 assert provider.unshelve(vm_name) is True
-                assert provider.wait_for_status(vm_name, provider_cfg.running_status, timeout=60) is True
+                assert (
+                    provider.wait_for_status(
+                        vm_name, provider_cfg.running_status, timeout=60
+                    )
+                    is True
+                )
 
         # 5. Info and List
         with StopWatch.timer(f"{provider_cfg.name}_info"):
@@ -358,7 +406,12 @@ def test_provider_lifecycle(provider_cfg, tmp_path, ssh_key):
         # 6. Stop and Delete
         with StopWatch.timer(f"{provider_cfg.name}_stop"):
             assert provider.stop(vm_name) is True
-            assert provider.wait_for_status(vm_name, provider_cfg.stopped_status, timeout=600) is True
+            assert (
+                provider.wait_for_status(
+                    vm_name, provider_cfg.stopped_status, timeout=600
+                )
+                is True
+            )
 
         with StopWatch.timer(f"{provider_cfg.name}_delete"):
             assert provider.delete(vm_name) is True

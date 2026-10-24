@@ -71,6 +71,7 @@ A professional application should not rely on a single source of truth. Instead,
 import os
 import keyring
 
+
 def get_secret(cloud_name, key_name, env_var=None):
     """
     Resolves a secret using a tiered priority:
@@ -90,6 +91,7 @@ def get_secret(cloud_name, key_name, env_var=None):
         return os.environ[env_var]
 
     return None
+
 
 # Usage
 aws_key = get_secret("aws", "access_key", env_var="AWS_ACCESS_KEY_ID")

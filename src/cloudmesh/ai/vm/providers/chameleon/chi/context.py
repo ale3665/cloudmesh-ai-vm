@@ -3,7 +3,6 @@ import os
 import re
 import sys
 import time
-from typing import List, Optional
 
 import ipywidgets as widgets
 import openstack
@@ -275,7 +274,7 @@ def params():
     return keys
 
 
-def list_sites(show: Optional[str] = None) -> dict:
+def list_sites(show: str | None = None) -> dict:
     """
     Retrieves a list of Chameleon sites.
 
@@ -395,10 +394,8 @@ def use_site(site_name: str) -> None:
     site = _sites.get(site_name)
     if not site:
         raise CHIValueError(
-            (
-                f'No site named "{site_name}" exists! Possible values: , '.join(
-                    _sites.keys()
-                )
+            f'No site named "{site_name}" exists! Possible values: , '.join(
+                _sites.keys()
             )
         )
 
@@ -510,7 +507,7 @@ def get_lease_id():
     return _lease_id
 
 
-def get_project_name(project_id: Optional[str] = None) -> str:
+def get_project_name(project_id: str | None = None) -> str:
     """
     Returns the name of a project by ID, or the current project name if no ID is given.
 
@@ -544,7 +541,7 @@ def get_project_name(project_id: Optional[str] = None) -> str:
     return project.name
 
 
-def list_projects(show: str = None) -> List[str]:
+def list_projects(show: str = None) -> list[str]:
     """
     Retrieves a list of projects associated with the current user.
 

@@ -1,6 +1,6 @@
-import pytest
 from cloudmesh.ai.vm.aws.AwsManager import AwsManager
 from tests.matrix.base import MatrixTestBase
+
 
 class TestAwsMatrix(MatrixTestBase):
     def test_capabilities(self):

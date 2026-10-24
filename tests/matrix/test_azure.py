@@ -1,6 +1,6 @@
-import pytest
 from cloudmesh.ai.vm.azure.AzureManager import AzureManager
 from tests.matrix.base import MatrixTestBase
+
 
 class TestAzureMatrix(MatrixTestBase):
     def test_capabilities(self):

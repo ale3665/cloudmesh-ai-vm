@@ -1,22 +1,21 @@
-import pytest
+import inspect
 import json
 import os
-import inspect
-from typing import Dict, Any
 from unittest.mock import MagicMock, patch
-from tests.compliance.mock_driver import MockDriverFactory
 
-
+import pytest
 
 from cloudmesh.ai.vm.base import BaseVMProvider
 from cloudmesh.ai.vm.providers import PROVIDER_MAP
 from tests.compliance.base import ComplianceHelper
+from tests.compliance.mock_driver import MockDriverFactory
 
 # Load mock configurations
 with open("tests/compliance/configs/all_providers.json", "r") as f:
     ALL_CONFIGS = json.load(f)
 
 COMPLIANCE_MODE = os.environ.get("COMPLIANCE_MODE", "unit")
+
 
 @pytest.mark.compliance
 @pytest.mark.parametrize("cloud_name", PROVIDER_MAP.keys())
@@ -41,9 +40,13 @@ class TestProviderCompliance:
         except Exception:
             if COMPLIANCE_MODE == "unit":
                 # Tiered fallback: try patching the driver retrieval method first
-                if hasattr(provider_cls, '_get_driver'):
+                if hasattr(provider_cls, "_get_driver"):
                     try:
-                        with patch.object(provider_cls, '_get_driver', return_value=MockDriverFactory.get_driver()):
+                        with patch.object(
+                            provider_cls,
+                            "_get_driver",
+                            return_value=MockDriverFactory.get_driver(),
+                        ):
                             self.provider = provider_cls(config=config)
                         # If we got here, we successfully instantiated with a mock driver
                     except Exception:
@@ -54,9 +57,11 @@ class TestProviderCompliance:
                         self.provider.validate_config.return_value = {}
                         self.provider.list.return_value = []
                         self.provider.get_provider_info.return_value = {}
-                elif hasattr(provider_cls, '_init_oci_client'):
+                elif hasattr(provider_cls, "_init_oci_client"):
                     try:
-                        with patch.object(provider_cls, '_init_oci_client', return_value=None):
+                        with patch.object(
+                            provider_cls, "_init_oci_client", return_value=None
+                        ):
                             self.provider = provider_cls(config=config)
                     except Exception:
                         self.provider = MagicMock(spec=provider_cls)
@@ -88,7 +93,9 @@ class TestProviderCompliance:
         """
         try:
             result = self.provider.validate_config()
-            assert isinstance(result, dict), f"validate_config for {self.cloud_name} must return a dict"
+            assert isinstance(result, dict), (
+                f"validate_config for {self.cloud_name} must return a dict"
+            )
         except Exception as e:
             pytest.fail(f"validate_config for {self.cloud_name} crashed: {e}")
 
@@ -106,9 +113,12 @@ class TestProviderCompliance:
         """
         try:
             result = self.provider.get_provider_info()
-            assert isinstance(result, dict), f"get_provider_info for {self.cloud_name} must return a dict"
+            assert isinstance(result, dict), (
+                f"get_provider_info for {self.cloud_name} must return a dict"
+            )
         except Exception as e:
             from cloudmesh.ai.vm.exceptions import ProviderFeatureNotSupported
+
             if not isinstance(e, ProviderFeatureNotSupported):
                 pytest.fail(f"get_provider_info for {self.cloud_name} crashed: {e}")
 
@@ -118,18 +128,21 @@ class TestProviderCompliance:
         """
         base_methods = inspect.getmembers(BaseVMProvider, predicate=inspect.isfunction)
         for name, base_method in base_methods:
-            if name.startswith('__'):
+            if name.startswith("__"):
                 continue
 
             provider_method = getattr(self.provider_cls, name, None)
             if provider_method is None:
-                pytest.fail(f"Provider {self.cloud_name} is missing required method {name}")
+                pytest.fail(
+                    f"Provider {self.cloud_name} is missing required method {name}"
+                )
 
             base_sig = inspect.signature(base_method)
             provider_sig = inspect.signature(provider_method)
 
-            assert base_sig == provider_sig, \
+            assert base_sig == provider_sig, (
                 f"Signature mismatch for {self.cloud_name}.{name}: Base {base_sig} vs Provider {provider_sig}"
+            )
 
     # --- OPTIONAL TESTS (Skipped if not supported) ---
 
@@ -139,16 +152,21 @@ class TestProviderCompliance:
         """
         if COMPLIANCE_MODE == "unit":
             from unittest.mock import MagicMock
+
             # Mock the methods to avoid real API calls
             self.provider.start = MagicMock(return_value="mock-vm-id")
             self.provider.stop = MagicMock(return_value=True)
             self.provider.delete = MagicMock(return_value=True)
             self.provider.exists = MagicMock(return_value=True)
 
-        vm_id = self.helper.ensure_supported(self.provider.start, name="compliance-test-vm")
+        vm_id = self.helper.ensure_supported(
+            self.provider.start, name="compliance-test-vm"
+        )
         if vm_id:
             assert self.helper.ensure_supported(self.provider.stop, name=vm_id) is True
-            assert self.helper.ensure_supported(self.provider.delete, name=vm_id) is True
+            assert (
+                self.helper.ensure_supported(self.provider.delete, name=vm_id) is True
+            )
 
     def test_zero_to_hero_scenario(self):
         """
@@ -158,6 +176,7 @@ class TestProviderCompliance:
         """
         if COMPLIANCE_MODE == "unit":
             from unittest.mock import MagicMock
+
             # Setup a consistent mock state for the scenario
             self.provider.validate_config = MagicMock(return_value={})
             self.provider.start = MagicMock(return_value="scenario-vm-id")
@@ -168,7 +187,9 @@ class TestProviderCompliance:
 
         # 1. Validate Configuration
         config_errors = self.provider.validate_config()
-        assert isinstance(config_errors, dict), f"validate_config for {self.cloud_name} must return a dict"
+        assert isinstance(config_errors, dict), (
+            f"validate_config for {self.cloud_name} must return a dict"
+        )
 
         # 2. Start the VM
         vm_id = self.helper.ensure_supported(self.provider.start, name="hero-vm")
@@ -182,23 +203,32 @@ class TestProviderCompliance:
 
         # 4. Stop the VM
         stop_success = self.helper.ensure_supported(self.provider.stop, name=vm_id)
-        assert stop_success is True, f"Stop failed for {self.cloud_name} during scenario"
+        assert stop_success is True, (
+            f"Stop failed for {self.cloud_name} during scenario"
+        )
 
         # 5. Delete the VM
         delete_success = self.helper.ensure_supported(self.provider.delete, name=vm_id)
-        assert delete_success is True, f"Delete failed for {self.cloud_name} during scenario"
+        assert delete_success is True, (
+            f"Delete failed for {self.cloud_name} during scenario"
+        )
         if COMPLIANCE_MODE == "unit":
             from unittest.mock import MagicMock
+
             # Mock the methods to avoid real API calls
             self.provider.start = MagicMock(return_value="mock-vm-id")
             self.provider.stop = MagicMock(return_value=True)
             self.provider.delete = MagicMock(return_value=True)
             self.provider.exists = MagicMock(return_value=True)
 
-        vm_id = self.helper.ensure_supported(self.provider.start, name="compliance-test-vm")
+        vm_id = self.helper.ensure_supported(
+            self.provider.start, name="compliance-test-vm"
+        )
         if vm_id:
             assert self.helper.ensure_supported(self.provider.stop, name=vm_id) is True
-            assert self.helper.ensure_supported(self.provider.delete, name=vm_id) is True
+            assert (
+                self.helper.ensure_supported(self.provider.delete, name=vm_id) is True
+            )
 
     def test_zero_to_hero_scenario(self):
         """
@@ -208,6 +238,7 @@ class TestProviderCompliance:
         """
         if COMPLIANCE_MODE == "unit":
             from unittest.mock import MagicMock
+
             # Setup a consistent mock state for the scenario
             self.provider.validate_config = MagicMock(return_value={})
             self.provider.start = MagicMock(return_value="scenario-vm-id")
@@ -218,7 +249,9 @@ class TestProviderCompliance:
 
         # 1. Validate Configuration
         config_errors = self.provider.validate_config()
-        assert isinstance(config_errors, dict), f"validate_config for {self.cloud_name} must return a dict"
+        assert isinstance(config_errors, dict), (
+            f"validate_config for {self.cloud_name} must return a dict"
+        )
 
         # 2. Start the VM
         vm_id = self.helper.ensure_supported(self.provider.start, name="hero-vm")
@@ -232,22 +265,31 @@ class TestProviderCompliance:
 
         # 4. Stop the VM
         stop_success = self.helper.ensure_supported(self.provider.stop, name=vm_id)
-        assert stop_success is True, f"Stop failed for {self.cloud_name} during scenario"
+        assert stop_success is True, (
+            f"Stop failed for {self.cloud_name} during scenario"
+        )
 
         # 5. Delete the VM
         delete_success = self.helper.ensure_supported(self.provider.delete, name=vm_id)
-        assert delete_success is True, f"Delete failed for {self.cloud_name} during scenario"
+        assert delete_success is True, (
+            f"Delete failed for {self.cloud_name} during scenario"
+        )
         if COMPLIANCE_MODE == "unit":
             from unittest.mock import MagicMock
+
             # Mock the methods to avoid real API calls
             self.provider.start = MagicMock(return_value="mock-vm-id")
             self.provider.stop = MagicMock(return_value=True)
             self.provider.delete = MagicMock(return_value=True)
 
-        vm_id = self.helper.ensure_supported(self.provider.start, name="compliance-test-vm")
+        vm_id = self.helper.ensure_supported(
+            self.provider.start, name="compliance-test-vm"
+        )
         if vm_id:
             assert self.helper.ensure_supported(self.provider.stop, name=vm_id) is True
-            assert self.helper.ensure_supported(self.provider.delete, name=vm_id) is True
+            assert (
+                self.helper.ensure_supported(self.provider.delete, name=vm_id) is True
+            )
 
     def test_vm_restart(self):
         """
@@ -255,9 +297,15 @@ class TestProviderCompliance:
         """
         if COMPLIANCE_MODE == "unit":
             from unittest.mock import MagicMock
+
             self.provider.restart = MagicMock(return_value=True)
 
-        assert self.helper.ensure_supported(self.provider.restart, name="compliance-test-vm") is True
+        assert (
+            self.helper.ensure_supported(
+                self.provider.restart, name="compliance-test-vm"
+            )
+            is True
+        )
 
     def test_ssh_key_management(self):
         """
@@ -265,15 +313,24 @@ class TestProviderCompliance:
         """
         if COMPLIANCE_MODE == "unit":
             from unittest.mock import MagicMock
+
             self.provider.upload_key = MagicMock(return_value=True)
             self.provider.get_keys = MagicMock(return_value=[{"name": "test-key"}])
             self.provider.delete_key = MagicMock(return_value=True)
 
-        assert self.helper.ensure_supported(self.provider.upload_key, "/tmp/id_rsa.pub", "test-key") is True
+        assert (
+            self.helper.ensure_supported(
+                self.provider.upload_key, "/tmp/id_rsa.pub", "test-key"
+            )
+            is True
+        )
         keys = self.helper.ensure_supported(self.provider.get_keys)
         if keys:
             self.helper.assert_is_list_of_dicts(keys, item_key="name")
-            assert self.helper.ensure_supported(self.provider.delete_key, "test-key") is True
+            assert (
+                self.helper.ensure_supported(self.provider.delete_key, "test-key")
+                is True
+            )
 
     def test_security_groups(self):
         """
@@ -281,15 +338,32 @@ class TestProviderCompliance:
         """
         if COMPLIANCE_MODE == "unit":
             from unittest.mock import MagicMock
+
             self.provider.create_security_group = MagicMock(return_value=True)
             self.provider.add_security_group_rule = MagicMock(return_value="rule-123")
             self.provider.delete_security_group = MagicMock(return_value=True)
 
-        assert self.helper.ensure_supported(self.provider.create_security_group, "compliance-sg", "Test SG") is True
-        rule_id = self.helper.ensure_supported(self.provider.add_security_group_rule, "compliance-sg", "tcp", "80", "0.0.0.0/0")
+        assert (
+            self.helper.ensure_supported(
+                self.provider.create_security_group, "compliance-sg", "Test SG"
+            )
+            is True
+        )
+        rule_id = self.helper.ensure_supported(
+            self.provider.add_security_group_rule,
+            "compliance-sg",
+            "tcp",
+            "80",
+            "0.0.0.0/0",
+        )
         if rule_id:
             assert isinstance(rule_id, str)
-            assert self.helper.ensure_supported(self.provider.delete_security_group, "compliance-sg") is True
+            assert (
+                self.helper.ensure_supported(
+                    self.provider.delete_security_group, "compliance-sg"
+                )
+                is True
+            )
 
     def test_floating_ip(self):
         """
@@ -297,10 +371,18 @@ class TestProviderCompliance:
         """
         if COMPLIANCE_MODE == "unit":
             from unittest.mock import MagicMock
+
             self.provider.assign_floating_ip = MagicMock(return_value="1.2.3.4")
             self.provider.release_floating_ip = MagicMock(return_value=True)
 
-        ip = self.helper.ensure_supported(self.provider.assign_floating_ip, "compliance-test-vm")
+        ip = self.helper.ensure_supported(
+            self.provider.assign_floating_ip, "compliance-test-vm"
+        )
         if ip:
             assert isinstance(ip, str)
-            assert self.helper.ensure_supported(self.provider.release_floating_ip, "compliance-test-vm") is True
+            assert (
+                self.helper.ensure_supported(
+                    self.provider.release_floating_ip, "compliance-test-vm"
+                )
+                is True
+            )

@@ -3,7 +3,6 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Set, Tuple
 
 import pandas as pd
 import requests
@@ -61,16 +60,16 @@ class Node:
     cpu: dict
     gpu: dict
     main_memory: dict
-    network_adapters: List[dict]
+    network_adapters: list[dict]
     placement: dict
-    storage_devices: List[dict]
+    storage_devices: list[dict]
     uid: str
     version: str
     reservable: bool
 
     def next_free_timeslot(
         self, minimum_hours: int = 1
-    ) -> Tuple[datetime, Optional[datetime]]:
+    ) -> tuple[datetime, datetime | None]:
         """
         Finds the next available timeslot for the hardware using the Blazar client.
 
@@ -210,10 +209,10 @@ def _call_api(endpoint):
 def get_nodes(
     all_sites: bool = False,
     filter_reserved: bool = False,
-    gpu: Optional[bool] = None,
-    min_number_cpu: Optional[int] = None,
-    node_type: Optional[str] = None,
-) -> List[Node]:
+    gpu: bool | None = None,
+    min_number_cpu: int | None = None,
+    node_type: str | None = None,
+) -> list[Node]:
     """
     Retrieve a list of nodes based on the specified criteria.
 
@@ -344,10 +343,10 @@ def _parse_blazar_dt(datetime_string):
 def _reserved_now(allocation, now=datetime.now(timezone.utc)):
     start_dt_object = _parse_blazar_dt(allocation["start_date"])
     end_dt_object = _parse_blazar_dt(allocation["end_date"])
-    return start_dt_object < now and now < end_dt_object
+    return start_dt_object < now < end_dt_object
 
 
-def get_node_types() -> List[str]:
+def get_node_types() -> list[str]:
     """
     Retrieve a list of unique node types.
 
@@ -367,7 +366,7 @@ def _gpu_background_color(cell):
     return "#d3d3d3" if not cell.value else None
 
 
-def show_nodes(nodes: Optional[List[Node]] = None) -> None:
+def show_nodes(nodes: list[Node] | None = None) -> None:
     """
     Display a sortable, filterable table of available nodes.
 
@@ -452,15 +451,15 @@ class Device:
 
     device_name: str
     device_type: str
-    supported_device_profiles: List[str]
-    authorized_projects: Set[str]
+    supported_device_profiles: list[str]
+    authorized_projects: set[str]
     owning_project: str
     uuid: str
     reservable: bool
 
     def next_free_timeslot(
         self, minimum_hours: int = 1
-    ) -> Tuple[datetime, Optional[datetime]]:
+    ) -> tuple[datetime, datetime | None]:
         """
         Finds the next available timeslot for the device using the Blazar client.
 
@@ -495,10 +494,10 @@ class Device:
 
 
 def get_devices(
-    device_type: Optional[str] = None,
+    device_type: str | None = None,
     filter_reserved: bool = False,
     filter_unauthorized: bool = True,
-) -> List[Device]:
+) -> list[Device]:
     """
     Retrieve a list of devices based on the specified criteria.
 
@@ -584,7 +583,7 @@ def get_devices(
     return unreserved_devices
 
 
-def get_device_types() -> List[str]:
+def get_device_types() -> list[str]:
     """
     Retrieve a list of unique device types.
 
