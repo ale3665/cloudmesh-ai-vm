@@ -63,3 +63,8 @@ oracle = "cloudmesh.ai.vm.oracle.OracleManager:Provider"
 markers = [
     "compliance: mark test as a compliance test",
 ]
+
+[tool.ruff]
+# Ignore N999 (Invalid module name) and BLE001 (blind exception) specifically for tests
+per-file-ignores = { "tests/**/*" = ["N999", "BLE001"] }
+
