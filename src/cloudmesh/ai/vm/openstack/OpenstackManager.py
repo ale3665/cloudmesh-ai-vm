@@ -887,8 +887,8 @@ class OpenstackManager(CloudBaseManager):
 
     def _wait_for_network(self, node, timeout: int = 300) -> bool:
         """
-        Probes the VM until its private network interfaces are ready.
-        Returns True if private IPs are assigned, False otherwise.
+        Probes the VM until its fixed network interface is ready.
+        Returns True when at least one fixed IP address is assigned.
         """
         import time
 
@@ -896,18 +896,33 @@ class OpenstackManager(CloudBaseManager):
 
         logger.info(f"Probing network readiness for VM {node.name}...")
         start_time = time.time()
-        while time.time() - start_time < timeout:
-            # Refresh node state from driver
-            node = self._find_node(node.name)
-            if node and getattr(node, "private_ips", None):
-                logger.info(
-                    f"Network is ready for {node.name} (Private IPs: {node.private_ips})."
-                )
-                return True
 
-            state = getattr(node, "state", "unknown") if node else "not found"
+        while time.time() - start_time < timeout:
+            # Refresh the server using the OpenStack SDK.
+            node = self._find_node(node.name)
+
+            if node:
+                addresses = getattr(node, "addresses", {}) or {}
+
+                has_fixed_ip = any(
+                    addr.get("addr")
+                    for network_addresses in addresses.values()
+                    for addr in network_addresses
+                    if isinstance(addr, dict)
+                    and addr.get("OS-EXT-IPS:type") in (None, "fixed")
+                )
+
+                if has_fixed_ip:
+                    logger.info(
+                        f"Network is ready for {node.name} "
+                        f"(Addresses: {addresses})."
+                    )
+                    return True
+
+            status = getattr(node, "status", "unknown") if node else "not found"
             logger.info(
-                f"Network not ready for {node.name} yet (State: {state}). Waiting 5s..."
+                f"Network not ready for {node.name} yet "
+                f"(Status: {status}). Waiting 5s..."
             )
             time.sleep(5)
 
