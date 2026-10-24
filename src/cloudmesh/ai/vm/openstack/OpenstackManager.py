@@ -85,8 +85,14 @@ class OpenstackManager(CloudBaseManager):
                 region_name=cloud_config.get("region_name") or auth.get("region_name")
             )
         except Exception as e:
-            logger.error(f"Failed to connect to OpenStack SDK for cloud {self.cloud_name}: {e}")
-            raise VMAuthError(f"OpenStack SDK connection failed: {e}") from e
+            logger.error(
+                f"Failed to connect to OpenStack SDK for cloud "
+                f"{self.cloud_name} ({type(e).__name__})"
+            )
+            raise VMAuthError(
+                f"OpenStack SDK connection failed for cloud "
+                f"'{self.cloud_name}'"
+            ) from e
 
     def start(self, name: Optional[str] = None, flavor: Optional[str] = None, image: Optional[str] = None, **kwargs) -> str:
         """Starts a VM in OpenStack using the SDK."""
@@ -723,6 +729,7 @@ class OpenstackManager(CloudBaseManager):
 
         return None
 
+    def _get_floating_ip(self, name: str) -> Optional[str]:
         """
         Internal helper to retrieve the floating IP address of a VM.
         """
