@@ -14,9 +14,9 @@ We welcome contributions to make `cloudmesh-ai-vm` more powerful and supportive 
 
 ### Development Workflow
 
-- **Branching**: Create a feature branch from `main`.
+- **Branching**: All active development and feature integration happen in the `dev2` branch. Please create your feature branches from `dev2` rather than `main`.
 - **Commits**: Use descriptive commit messages.
-- **PRs**: Submit a Pull Request with a clear description of the changes and examples of how to use the new feature.
+- **PRs**: Submit a Pull Request targeting the `dev2` branch with a clear description of the changes and examples of how to use the new feature.
 
 ## Code Formatting
 
