@@ -18,6 +18,33 @@ We welcome contributions to make `cloudmesh-ai-vm` more powerful and supportive 
 - **Commits**: Use descriptive commit messages.
 - **PRs**: Submit a Pull Request with a clear description of the changes and examples of how to use the new feature.
 
+## Code Formatting
+
+To maintain a consistent style across the codebase, please format your code before committing.
+
+### Ruff
+We use `ruff` for both linting and formatting. You can run it manually:
+
+```bash
+# Check for linting issues
+ruff check .
+
+# Automatically fix linting issues
+ruff check --fix .
+
+# Format the code
+ruff format .
+```
+
+### Pre-commit Hooks
+The project includes a `.pre-commit-config.yaml` file. We recommend installing the `pre-commit` framework to automate formatting on every commit:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+This will ensure that `ruff` is run automatically before each commit.
+
 ## Coding Standards
 
 - Follow **PEP 8** guidelines.
