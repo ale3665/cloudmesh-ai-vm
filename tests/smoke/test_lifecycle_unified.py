@@ -55,50 +55,24 @@ def verify_connectivity_ssh_execute(
     ip = info.get("FloatingIP") or info.get("ip") or info.get("address")
     if not ip:
         return False
-<<<<<<< HEAD
-
     user = provider.get_cloud_config(provider.cloud_name).get("user", "ubuntu")
 
-    for attempt in range(10):
+    for attempt in range(retries):
         hostname = provider._execute_ssh_command(
             ip,
             user,
             priv_key_path,
-            "hostname"
+            "hostname",
         )
 
         if "SSH Error" not in hostname:
             return True
 
-        if attempt < 9:
-            time.sleep(10)
-
-    return False
-=======
-    user = provider.get_cloud_config(provider.cloud_name).get("username", "ubuntu")
-
-    for attempt in range(retries):
-        hostname = provider._execute_ssh_command(ip, user, priv_key_path, "hostname")
-        if hostname and "Error" not in hostname:
-            return True
-        print(
-            f"SSH service not ready yet (attempt {attempt + 1}/{retries}), waiting {delay}s..."
-        )
-        time.sleep(delay)
+        if attempt < retries - 1:
+            time.sleep(delay)
 
     return False
 
-
-# def verify_connectivity_ssh_execute(provider, vm_name, priv_key_path):
-#     # This is for providers that might not have run_command but have _execute_ssh_command
-#     info = provider.info(vm_name)
-#     ip = info.get("FloatingIP") or info.get("ip") or info.get("address")
-#     if not ip:
-#         return False
-#     user = provider.get_cloud_config(provider.cloud_name).get("user", "ubuntu")
-#     hostname = provider._execute_ssh_command(ip, user, priv_key_path, "hostname")
-#     return "Error" not in hostname
->>>>>>> dev2
 
 
 def verify_connectivity_multipass_exec(provider, vm_name):
@@ -235,11 +209,12 @@ def ssh_key(tmp_path):
     return str(key_path), str(pub_key_path)
 
 
-def create_temp_config(tmp_path, provider_cfg):
+def create_temp_config(tmp_path, provider_cfg, pub_key_path=None):
     config_dir = tmp_path / ".config" / "cloudmesh"
     config_dir.mkdir(parents=True)
     config_file = config_dir / "clouds.yaml"
     cloud_config = dict(provider_cfg.cloud_config)
+    cloud_config.setdefault("username", "smoke_test_user")
 
     if provider_cfg.name == "chameleon" and pub_key_path:
         cloud_config["key_path"] = pub_key_path
@@ -247,14 +222,8 @@ def create_temp_config(tmp_path, provider_cfg):
 
     config_data = {
         "clouds": {
-<<<<<<< HEAD
             provider_cfg.name: cloud_config
-=======
-            provider_cfg.name: {
-                "username": "smoke_test_user",
-                **provider_cfg.cloud_config,
-            }
->>>>>>> dev2
+
         }
     }
 
