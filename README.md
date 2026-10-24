@@ -161,12 +161,12 @@ Tests can be run in two modes:
 
 - **Unit Mode (Default)**: Uses a standardized `MockDriver` to verify return types and basic logic without needing cloud credentials, ensuring a reliable functional baseline across all providers.
   ```bash
-  PYTHONPATH=. pytest tests/compliance/test_compliance.py
+  PYTHONPATH=. pytest -s tests/compliance/test_compliance.py
   ```
 
 - **Integration Mode**: Performs real operations against actual cloud infrastructure. Requires valid credentials in your configuration.
   ```bash
-  PYTHONPATH=. COMPLIANCE_MODE=integration pytest tests/compliance/test_compliance.py
+  PYTHONPATH=. COMPLIANCE_MODE=integration pytest -s tests/compliance/test_compliance.py
   ```
 
 The compliance suite also includes **Scenario Tests** (such as the "Zero-to-Hero" flow) to validate that the end-to-end user experience—from configuration validation to VM deletion—is consistent across all supported cloud and local providers.
