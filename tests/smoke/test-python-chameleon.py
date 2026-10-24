@@ -124,7 +124,7 @@ def verify_connectivity_ssh_execute(
 def verify_connectivity_multipass_exec(provider, vm_name):
     # Multipass uses a specific CLI execution
     result = subprocess.run(
-        ["multipass", "exec", vm_name, "--", "hostname"], capture_output=True, text=True
+        ["multipass", "exec", vm_name, "--", "hostname"], check=False, capture_output=True, text=True
     )
     return result.returncode == 0
 
@@ -152,7 +152,7 @@ def verify_key_presence(provider, vm_name, pub_key_path, priv_key_path, strategy
     elif strategy == "multipass_exec":
         result = subprocess.run(
             ["multipass", "exec", vm_name, "--", "bash", "-c", verify_cmd],
-            capture_output=True,
+            check=False, capture_output=True,
         )
         return result.returncode == 0
 

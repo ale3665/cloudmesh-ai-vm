@@ -78,7 +78,7 @@ def verify_connectivity_ssh_execute(
 def verify_connectivity_multipass_exec(provider, vm_name):
     # Multipass uses a specific CLI execution
     result = subprocess.run(
-        ["multipass", "exec", vm_name, "--", "hostname"], capture_output=True, text=True
+        ["multipass", "exec", vm_name, "--", "hostname"], check=False, capture_output=True, text=True
     )
     return result.returncode == 0
 
