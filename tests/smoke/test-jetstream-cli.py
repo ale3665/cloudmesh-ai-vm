@@ -1,11 +1,15 @@
+import os
 import re
+import uuid
 from pprint import pprint
 
 import pytest
+import yaml
 from click.testing import CliRunner
 from rich.text import Text
 
 from cloudmesh.ai.command import vm
+from tests.smoke.benchmark_helper import save_benchmark
 from tests.smoke.cli_helper import setup_cli_config
 
 
