@@ -1,14 +1,9 @@
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cloudmesh.ai.vm.exceptions import VMProviderError
 from cloudmesh.ai.vm.openstack.OpenstackManager import OpenstackManager
-
-import pytest
-
-from cloudmesh.ai.vm.openstack.OpenstackManager import OpenstackManager
-
 
 MOCK_CONFIG = {
     "clouds": {
@@ -29,45 +24,40 @@ class TestOpenstackDetailed:
     floating IP logic, and error handling.
     """
 
-@pytest.fixture
-def provider():
-    return OpenstackManager(
-        MOCK_CONFIG,
-        cloud_name="test-openstack",
-    )
+    @pytest.fixture
+    def provider(self):
+        return OpenstackManager(
+            MOCK_CONFIG,
+            cloud_name="test-openstack",
+        )
 
+    def test_list_sdk_success(self, provider):
+        conn = MagicMock()
 
-def test_list_sdk_success(provider):
-    conn = MagicMock()
+        server = SimpleNamespace(
+            name="vm1",
+            id="id1",
+            status="ACTIVE",
+            addresses={
+                "private": [{"addr": "10.0.0.1"}],
+                "floating": [{"addr": "1.2.3.4"}],
+            },
+            image=SimpleNamespace(name="img1"),
+            flavor=SimpleNamespace(name="flv1"),
+        )
 
-    server = SimpleNamespace(
-        name="vm1",
-        id="id1",
-        status="ACTIVE",
-        addresses={
-            "private": [{"addr": "10.0.0.1"}],
-            "floating": [{"addr": "1.2.3.4"}],
-        },
-        image=SimpleNamespace(name="img1"),
-        flavor=SimpleNamespace(name="flv1"),
-    )
+        conn.compute.servers.return_value = [server]
 
-    conn.compute.servers.return_value = [server]
+        with patch.object(provider, "_get_sdk_conn", return_value=conn):
+            vms = provider.list()
 
-    with patch.object(provider, "_get_sdk_conn", return_value=conn):
-        vms = provider.list()
-
-    assert len(vms) == 1
-    assert vms[0]["name"] == "vm1"
-    assert vms[0]["id"] == "id1"
-    assert vms[0]["status"] == "ACTIVE"
-    assert vms[0]["ip"] == "1.2.3.4"
-    assert vms[0]["image"] == "img1"
-    assert vms[0]["flavor"] == "flv1"
-
-
-def test_get_floating_ip_success(provider):
-    conn = MagicMock()
+        assert len(vms) == 1
+        assert vms[0]["name"] == "vm1"
+        assert vms[0]["id"] == "id1"
+        assert vms[0]["status"] == "ACTIVE"
+        assert vms[0]["ip"] == "1.2.3.4"
+        assert vms[0]["image"] == "img1"
+        assert vms[0]["flavor"] == "flv1"
 
     def test_get_floating_ip_success(self, provider):
         """Verify _get_floating_ip correctly parses the 'addresses' output."""
@@ -89,16 +79,14 @@ def test_get_floating_ip_success(provider):
             ip = provider._get_floating_ip("test-vm")
             assert ip is None
 
-    with patch.object(provider, "_get_sdk_conn", return_value=conn):
-        ip = provider._get_floating_ip("test-vm")
-
-    assert ip == "1.2.3.4"
-    conn.compute.find_server.assert_called_once_with("test-vm")
-
+    def test_assign_floating_ip_success(self, provider):
+        mock_fip = MagicMock(id="fip-123", ip="1.2.3.4")
+        mock_node = MagicMock(id="node-123")
+        
+        # We need to mock the driver since we are testing the Manager's orchestration
+        provider.driver = MagicMock()
         provider.driver.ex_create_floating_ip.return_value = mock_fip
-        provider.driver._find_node.return_value = (
-            mock_node  # Not used by manager, manager uses _find_node
-        )
+        provider.driver._find_node.return_value = mock_node
 
         with (
             patch.object(provider, "_find_node", return_value=mock_node),
@@ -111,13 +99,12 @@ def test_get_floating_ip_success(provider):
                 mock_node, mock_fip
             )
 
-    conn.compute.find_server.return_value = server
-
-    with patch.object(provider, "_get_sdk_conn", return_value=conn):
-        ip = provider._get_floating_ip("test-vm")
-
-    assert ip is None
-
+    def test_release_floating_ip_success(self, provider):
+        mock_fip = MagicMock(id="fip-123")
+        mock_node = MagicMock(id="node-123")
+        
+        provider.driver = MagicMock()
+        
         with patch.object(provider, "_find_node", return_value=mock_node):
             result = provider.release_floating_ip("test-vm")
             assert result is True

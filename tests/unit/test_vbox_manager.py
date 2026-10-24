@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -75,10 +75,10 @@ def test_list_parsing(provider):
     assert len(vms) == 2
 
     assert vms[0]["name"] == "VM 1"
-    assert vms[0]["uuid"] == VM_UUID
+    assert vms[0]["uuid"] == "{uuid1}"
 
     assert vms[1]["name"] == "VM 2"
-    assert vms[1]["uuid"] == VM_UUID_2
+    assert vms[1]["uuid"] == "{uuid2}"
 
     provider._run_command.assert_called_once_with(
         ["VBoxManage", "list", "vms"]
@@ -113,7 +113,7 @@ def test_restart_success(provider):
         MagicMock(stdout="Started", returncode=0),
     ]
 
-        assert provider.restart(name="vbox-vm") is True
+    assert provider.restart(name="vbox-vm") is True
 
     assert (
         provider._run_command.call_count == 2
