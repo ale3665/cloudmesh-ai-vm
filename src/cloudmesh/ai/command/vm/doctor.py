@@ -81,7 +81,6 @@ def _status_label(status):
 )
 @click.pass_context
 @vm_options
-@handle_errors
 def doctor(ctx: click.Context, strict: bool = False, **kwargs) -> None:
     """
     Diagnose the active VM provider without modifying any VM resources.
