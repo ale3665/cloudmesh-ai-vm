@@ -50,3 +50,51 @@ This will ensure that `ruff` is run automatically before each commit.
 - Follow **PEP 8** guidelines.
 - Use **type hinting** for all method signatures.
 - Ensure all new functionality is covered by **unit tests**.
+
+## Appendix: Step-by-Step Feature Workflow
+
+To help new contributors get started, here is a detailed guide on the development cycle for this project.
+
+### 1. Environment Setup
+Always start from the latest state of the integration branch:
+```bash
+git checkout dev2
+git pull origin dev2
+```
+
+### 2. Branching
+Create a descriptive feature branch to keep your work isolated:
+```bash
+git checkout -b feature/your-feature-name
+```
+
+### 3. Implementation & Testing
+Develop your feature following the coding standards. Ensure you add unit tests for any new logic:
+```bash
+# Run your specific tests to verify
+PYTHONPATH=. pytest tests/unit/test_your_feature.py
+```
+
+### 4. Formatting & Linting
+Ensure your code is clean and formatted before submitting. We use `ruff`:
+```bash
+# Automatically fix linting and format code
+ruff check --fix .
+ruff format .
+```
+*Tip: Use `pre-commit install` to automate this step on every commit.*
+
+### 5. Committing and Pushing
+```bash
+git add .
+git commit -m "feat: description of your change"
+git push origin feature/your-feature-name
+```
+
+### 6. Creating the Pull Request
+1. Navigate to the GitHub repository.
+2. Click **"Compare & pull request"**.
+3. **Crucial**: Set the **base branch** to `dev2` (not `main`).
+4. Provide a clear description and a usage example of the new feature.
+5. Submit the PR for review.
+
