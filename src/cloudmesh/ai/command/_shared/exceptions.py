@@ -21,9 +21,11 @@ def handle_errors(f):
     def wrapper(*args, **kwargs):
         try:
             return f(*args, **kwargs)
-        except VMCommandError as e:
-            console.print(f"[bold red]Error:[/bold red] {e.message}")
-            raise click.Abort()
+        except (VMCommandError, SystemExit) as e:
+            if isinstance(e, VMCommandError):
+                console.print(f"[bold red]Error:[/bold red] {e.message}")
+                raise click.Abort()
+            raise e
         except Exception as e:
             # Check if it's a configuration or provider error
             e_type = type(e).__name__
