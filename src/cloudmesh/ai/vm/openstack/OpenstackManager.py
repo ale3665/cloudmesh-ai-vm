@@ -1539,7 +1539,17 @@ class OpenstackManager(CloudBaseManager):
             )
             import json
 
-            data = json.loads(cli_output)
+            # The CLI helper normally returns CompletedProcess,
+            # but older tests may provide the JSON string directly.
+            if hasattr(cli_output, "returncode") and cli_output.returncode != 0:
+                raise ValueError("OpenStack configuration command failed")
+
+            output = (
+                cli_output.stdout
+                if hasattr(cli_output, "stdout")
+                else cli_output
+            )
+            data = json.loads(output)
             # The CLI may return keys with dot notation (e.g., "auth.auth_url").
             region = data.get("region_name")
             auth_url = data.get("auth.auth_url")
@@ -1548,8 +1558,11 @@ class OpenstackManager(CloudBaseManager):
             if auth_url:
                 info["auth_url"] = auth_url
         except Exception:
-            # Silently ignore errors – older implementations used SDK fallback.
-            pass
+            # Keep basic provider information available without exposing
+            # credentials or raw CLI exception messages.
+            info["diagnostic_warning"] = (
+                "OpenStack CLI configuration diagnostics unavailable."
+            )
 
         return info
 

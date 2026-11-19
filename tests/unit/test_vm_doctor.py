@@ -197,3 +197,41 @@ def test_doctor_strict_returns_nonzero_on_failure():
     # "Unexpected Error" by handle_errors.
     assert "Unexpected Error" not in result.output
     assert "Aborted!" not in result.output
+
+
+def test_doctor_warns_when_provider_diagnostics_unavailable():
+    provider = make_provider(
+        info={
+            "provider": "OpenStack",
+            "cloud_name": "jetstream",
+            "diagnostic_warning": (
+                "OpenStack CLI configuration diagnostics unavailable."
+            ),
+        }
+    )
+
+    runner = CliRunner()
+
+    with (
+        patch(
+            "cloudmesh.ai.command.vm.doctor.get_active_provider",
+            return_value=provider,
+        ),
+        patch(
+            "cloudmesh.ai.command.vm.doctor.render_table"
+        ) as mock_render,
+    ):
+        result = runner.invoke(doctor, ["--strict"])
+
+    assert result.exit_code == 0
+    assert "HEALTHY WITH WARNINGS" in result.output
+
+    rows = get_rows(mock_render)
+    provider_info_row = next(
+        row for row in rows if row[0] == "Provider Info"
+    )
+
+    assert "WARN" in provider_info_row[1]
+    assert "OpenStack CLI configuration diagnostics unavailable." in (
+        provider_info_row[2]
+    )

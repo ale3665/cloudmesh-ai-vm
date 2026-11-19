@@ -224,7 +224,16 @@ def doctor(
         try:
             info = provider.get_provider_info()
 
-            if info:
+            if info and isinstance(info, dict) and info.get("diagnostic_warning"):
+                warnings += 1
+                rows.append(
+                    [
+                        "Provider Info",
+                        _status_label("WARN"),
+                        str(info["diagnostic_warning"]),
+                    ]
+                )
+            elif info:
                 rows.append(
                     [
                         "Provider Info",
