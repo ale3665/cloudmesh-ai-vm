@@ -30,19 +30,46 @@ class Provider(LibcloudManager):
         )
 
     def _find_node(self, identifier: str):
-        """Helper to find a node by name or ID since some driver versions lack get_node."""
+        """Find an EC2 instance by exact instance ID or name.
+
+        Prefer instance IDs over names to avoid selecting a different
+        instance when a name resembles an EC2 instance ID.
+        """
+        if not identifier:
+            return None
+
         try:
             if hasattr(self.driver, "get_node"):
                 node = self.driver.get_node(identifier)
-                if node:
-                    return node
+                if node is not None and (
+                    getattr(node, "id", None) == identifier
+                    or getattr(node, "name", None) == identifier
+                ):
+                    # If the identifier is an EC2 ID, verify the actual
+                    # node ID instead of accepting a name collision.
+                    if not identifier.startswith("i-") or (
+                        getattr(node, "id", None) == identifier
+                    ):
+                        return node
         except Exception:
             pass
 
         nodes = self.driver.list_nodes()
-        return next(
-            (n for n in nodes if n.name == identifier or n.id == identifier), None
-        )
+
+        # Prefer exact instance IDs.
+        for node in nodes:
+            if getattr(node, "id", None) == identifier:
+                return node
+
+        # A requested EC2 ID must never resolve through a name match.
+        if identifier.startswith("i-"):
+            return None
+
+        for node in nodes:
+            if getattr(node, "name", None) == identifier:
+                return node
+
+        return None
 
     def start(
         self,

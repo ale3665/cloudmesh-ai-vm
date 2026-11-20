@@ -202,7 +202,10 @@ class TestLibcloudProviders:
 
             # Restart should raise ProviderFeatureNotSupported only when
             # neither the node nor the driver provides reboot support.
-            mock_node = MagicMock(spec=[])
+            # Give the node a valid identity so lookup can find it.
+            mock_node = MagicMock(spec=["id", "name"])
+            mock_node.id = "i-test"
+            mock_node.name = "test-vm"
 
             limited_driver = MagicMock(spec=["get_node"])
             limited_driver.get_node.return_value = mock_node
