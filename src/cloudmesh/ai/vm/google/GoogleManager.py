@@ -23,7 +23,14 @@ class Provider(LibcloudManager):
     """
 
     def __init__(self, config, **kwargs):
-        super().__init__(config, cloud_name="google", **kwargs)
+        """Initialize the Google provider without forwarding cloud_name twice.
+
+        The Cloudmesh provider factory may supply cloud_name in kwargs.
+        Remove it before passing the provider name to LibcloudManager,
+        avoiding a duplicate keyword argument error.
+        """
+        cloud_name = kwargs.pop("cloud_name", "google")
+        super().__init__(config, cloud_name=cloud_name, **kwargs)
 
     def _get_driver(self):
         cloud_config = self.get_cloud_config("google")

@@ -113,6 +113,31 @@ class TestLibcloudProviders:
         )
         assert provider.cloud_name == "google"
 
+    @patch("cloudmesh.ai.vm.google.GoogleManager.GCEDriver")
+    def test_google_factory_initialization(self, mock_driver_class):
+        """The factory must not pass cloud_name twice to LibcloudManager.
+
+        ProviderFactory supplies the cloud name through kwargs.
+        GoogleProvider must consume that argument before forwarding
+        arguments to its parent constructor.
+        """
+        from cloudmesh.ai.vm.factory import ProviderFactory
+
+        mock_driver_class.return_value = MagicMock()
+
+        with patch.dict(
+            ProviderFactory._registry,
+            {"google": GoogleProvider},
+        ):
+            provider = ProviderFactory.create("google", MOCK_CONFIG)
+
+        assert isinstance(provider, GoogleProvider)
+        assert provider.cloud_name == "google"
+        mock_driver_class.assert_called_once_with(
+            project_id="test-project",
+            private_key="/path/to/key.json",
+        )
+
     def test_lifecycle_methods(self, mock_driver):
         # Test using AWS Provider as the representative for LibcloudManager logic
         with patch(
