@@ -207,8 +207,8 @@ class TestLibcloudProviders:
             mock_node.id = "i-test"
             mock_node.name = "test-vm"
 
-            limited_driver = MagicMock(spec=["get_node"])
-            limited_driver.get_node.return_value = mock_node
+            limited_driver = MagicMock(spec=["list_nodes"])
+            limited_driver.list_nodes.return_value = [mock_node]
 
             provider.driver = limited_driver
 

@@ -30,41 +30,44 @@ class Provider(LibcloudManager):
         )
 
     def _find_node(self, identifier: str):
-        """Find an EC2 instance by exact instance ID or name.
+        """Find an EC2 instance by its unique ID or human-readable name.
 
-        Prefer instance IDs over names to avoid selecting a different
-        instance when a name resembles an EC2 instance ID.
+        Apache Libcloud's EC2NodeDriver provides list_nodes(), but does
+        not implement get_node(). Therefore, instance lookup uses the
+        list_nodes() API.
+
+        EC2 instance IDs begin with "i-" and are unique. Instance names
+        are user-defined Name tags and are not necessarily unique.
+
+        Lookup prioritizes exact instance IDs. Identifiers beginning
+        with "i-" are treated as IDs, not names, to avoid ID/name
+        collisions.
+
+        Note:
+            Duplicate Name tags remain ambiguous. This method returns
+            the first matching name, preserving existing behavior.
+
+        Args:
+            identifier: EC2 instance ID or Name tag.
+
+        Returns:
+            Matching Libcloud node, or None if no match is found.
         """
         if not identifier:
             return None
 
-        try:
-            if hasattr(self.driver, "get_node"):
-                node = self.driver.get_node(identifier)
-                if node is not None and (
-                    getattr(node, "id", None) == identifier
-                    or getattr(node, "name", None) == identifier
-                ):
-                    # If the identifier is an EC2 ID, verify the actual
-                    # node ID instead of accepting a name collision.
-                    if not identifier.startswith("i-") or (
-                        getattr(node, "id", None) == identifier
-                    ):
-                        return node
-        except Exception:
-            pass
-
         nodes = self.driver.list_nodes()
 
-        # Prefer exact instance IDs.
+        # Prioritize unique EC2 instance IDs over user-defined names.
         for node in nodes:
             if getattr(node, "id", None) == identifier:
                 return node
 
-        # A requested EC2 ID must never resolve through a name match.
+        # An ID-like identifier must resolve to an actual instance ID.
         if identifier.startswith("i-"):
             return None
 
+        # Fall back to human-readable names.
         for node in nodes:
             if getattr(node, "name", None) == identifier:
                 return node
