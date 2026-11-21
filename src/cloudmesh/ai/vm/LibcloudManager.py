@@ -39,12 +39,18 @@ class LibcloudManager(CloudBaseManager, ABC):
                 node = self.driver.get_node(name)
                 if node:
                     return node
-            # Fallback: list all nodes and find the matching one
+            # Prefer exact node IDs over potentially ambiguous names.
             nodes = self.driver.list_nodes()
-            return next(
-                (n for n in nodes if getattr(n, "name", None) == name or getattr(n, "id", None) == name),
-                None,
-            )
+
+            for node in nodes:
+                if getattr(node, "id", None) == name:
+                    return node
+
+            for node in nodes:
+                if getattr(node, "name", None) == name:
+                    return node
+
+            return None
         except Exception as e:
             logger.error(f"Error retrieving VM {name} in {self.cloud_name}: {e}")
             return None
